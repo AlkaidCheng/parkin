@@ -41,10 +41,14 @@ parkin is installed from its repository:
 pip install git+https://github.com/AlkaidCheng/parkin.git
 ```
 
-The build needs Python 3.11 or later, a C++20 compiler and Git. pip provides
-the remaining build tools (scikit-build-core, nanobind, and CMake 3.26 or
-later when the system has none). The xsimd headers are taken from an installed
-copy of version 14.3.0 or later and are downloaded otherwise.
+| Requirement | Supported |
+|---|---|
+| Python | 3.11 or later |
+| NumPy | 1.23 or later, including NumPy 2 |
+| C++ compiler (build only) | C++20 |
+
+The build also needs Git. pip provides the remaining build tools, and the
+xsimd headers are downloaded when no recent copy is installed.
 
 ## Usage
 

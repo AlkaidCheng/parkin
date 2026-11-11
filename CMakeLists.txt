@@ -52,9 +52,14 @@ target_compile_definitions(
 parkin_set_warnings(parkin_cpu)
 
 # The Python module parkin._core. STABLE_ABI takes effect on CPython 3.12 and
-# later; NB_SUPPRESS_WARNINGS keeps nanobind's headers out of parkin's warning
-# level.
-nanobind_add_module(_core STABLE_ABI NB_SUPPRESS_WARNINGS cpp/parkin/binding/module.cpp)
+# later. NB_SUPPRESS_WARNINGS keeps nanobind's headers out of parkin's warning
+# level; nanobind_add_module accepts it from nanobind 2.5.0 on (the entry of
+# that version in https://nanobind.readthedocs.io/en/latest/changelog.html).
+set(parkin_module_options STABLE_ABI)
+if(nanobind_VERSION VERSION_GREATER_EQUAL 2.5.0)
+  list(APPEND parkin_module_options NB_SUPPRESS_WARNINGS)
+endif()
+nanobind_add_module(_core ${parkin_module_options} cpp/parkin/binding/module.cpp)
 target_link_libraries(_core PRIVATE parkin_cpu)
 parkin_set_warnings(_core)
 
