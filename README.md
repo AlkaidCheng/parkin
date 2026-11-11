@@ -11,10 +11,10 @@ supports; no observable is implemented yet.
 
 ## Installation
 
-parkin is installed from a checkout of the repository:
+parkin is installed from its repository:
 
 ```
-pip install .
+pip install git+https://github.com/AlkaidCheng/parkin.git
 ```
 
 The build needs Python 3.11 or later, a C++20 compiler and Git. pip provides

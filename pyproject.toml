@@ -36,6 +36,9 @@ classifiers = [
 [project.optional-dependencies]
 dev = ["pytest", "ruff", "black", "mypy"]
 
+[project.urls]
+Repository = "https://github.com/AlkaidCheng/parkin"
+
 [tool.scikit-build]
 minimum-version = "build-system.requires"
 # CMake's build tree is kept between builds, so a rebuild compiles only what
