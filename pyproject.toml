@@ -1,10 +1,15 @@
 [build-system]
 # scikit-build-core drives CMake, nanobind binds the C++ core and
-# setuptools-scm derives the version from the git tags. The floor is the first
-# scikit-build-core that reads the license expression in [project]
-# (https://scikit-build-core.readthedocs.io/en/latest/about/changelog.html,
-# version 0.11.0).
-requires = ["scikit-build-core>=0.11", "nanobind", "setuptools-scm"]
+# setuptools-scm derives the version from the git tags. Each floor is the
+# oldest release the CI job "Test with the oldest supported versions" builds
+# with, and none has an upper bound:
+# - scikit-build-core 0.11.0 is the first that reads the license expression in
+#   [project] (https://scikit-build-core.readthedocs.io/en/latest/about/changelog.html).
+# - nanobind 1.9.2 is the last release of its 1.x series
+#   (https://nanobind.readthedocs.io/en/latest/changelog.html).
+# - setuptools-scm 8.0.1 is the first release of its 8.x series on PyPI
+#   (https://pypi.org/project/setuptools-scm/#history).
+requires = ["scikit-build-core>=0.11", "nanobind>=1.9.2", "setuptools-scm>=8.0.1"]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -42,7 +47,11 @@ classifiers = [
     "Typing :: Typed",
 ]
 
-dependencies = ["numpy"]
+# NumPy 1.23.2 is the first release with wheels for Python 3.11, the oldest
+# Python supported (https://numpy.org/doc/stable/release/1.23.2-notes.html).
+# The tests run against it and against the newest release, and there is no
+# upper bound.
+dependencies = ["numpy>=1.23.2"]
 
 [project.optional-dependencies]
 dev = ["pytest", "ruff", "black", "mypy"]

@@ -6,10 +6,11 @@ on:
   pull_request:
     branches: [main]
   schedule:
-    # The 1st and 15th of each month: every run installs the newest releases
-    # of the build and test tools, and the scheduled run also builds against
-    # xsimd's development branch, so a release that breaks parkin is found
-    # within two weeks.
+    # The 1st and 15th of each month: the test jobs install the newest
+    # releases of the build tools and dependencies, and the scheduled run also
+    # builds against xsimd's development branch, so a release that breaks
+    # parkin is found within two weeks. One job installs the oldest supported
+    # releases instead.
     - cron: "0 6 1,15 * *"
   workflow_dispatch:
 
@@ -64,6 +65,46 @@ jobs:
         run: >
           python -m pip install -v ".[dev]"
           --config-settings=cmake.define.PARKIN_WARNINGS_AS_ERRORS=ON
+      - name: pytest
+        run: pytest
+
+  oldest:
+    name: Test with the oldest supported versions
+    runs-on: ubuntu-latest
+    # Python 3.11, the oldest Python supported and the only one that can
+    # install the oldest NumPy, on Debian 11, whose compiler is GCC 10.2
+    # (https://packages.debian.org/bullseye/g++), the oldest the build is
+    # tested with.
+    container: python:3.11-bullseye
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      # pyproject.toml gives every build requirement and every dependency as
+      # name>=version, and this step turns each into name==version.
+      - name: List the oldest version of every requirement
+        shell: python
+        run: |
+          import re
+          import tomllib
+
+          with open("pyproject.toml", "rb") as file:
+              project = tomllib.load(file)
+          requirements = project["build-system"]["requires"] + project["project"]["dependencies"]
+          with open("oldest.txt", "w") as file:
+              for requirement in requirements:
+                  floor = re.fullmatch(r"([A-Za-z0-9_.-]+)>=([0-9.]+)", requirement)
+                  if floor is None:
+                      raise SystemExit(f"{requirement!r} must have the form name>=version")
+                  file.write(f"{floor[1]}=={floor[2]}\n")
+      # --build-constraint holds the build tools to the list as --constraint
+      # holds the dependencies; pip has it from 25.3 on
+      # (https://pip.pypa.io/en/stable/news/). Warnings are not errors here:
+      # nanobind before 2.5.0 cannot keep its headers out of the warning level.
+      - name: Build and install with those versions
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -v ".[dev]" --constraint oldest.txt --build-constraint oldest.txt
       - name: pytest
         run: pytest
 
