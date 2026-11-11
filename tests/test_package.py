@@ -1,4 +1,4 @@
-"""The public surface of the package and the type information it carries."""
+"""The public names of the package and the type information it carries."""
 
 import ast
 from importlib.resources import files
