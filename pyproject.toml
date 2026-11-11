@@ -10,7 +10,7 @@ build-backend = "scikit_build_core.build"
 [project]
 name = "parkin"
 dynamic = ["version"]
-description = "Fast particle kinematics on arrays, from invariant masses and Lorentz boosts to jet clustering and event shapes, in a vectorised C++ core."
+description = "High-performance computation of particle kinematics on array data, with a C++ core using SIMD, multithreading and CUDA."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "BSD-3-Clause"

@@ -1,4 +1,4 @@
-"""Fast particle kinematics on arrays, computed in a vectorised C++ core."""
+"""High-performance computation of particle kinematics on array data."""
 
 from importlib.metadata import version
 
