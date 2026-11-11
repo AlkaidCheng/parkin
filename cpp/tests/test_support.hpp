@@ -18,6 +18,7 @@
 
 #include "parkin/cpu/column_view.hpp"
 #include "parkin/cpu/instruction_set.hpp"
+#include "parkin/cpu/map_executor.hpp"
 #include "parkin/cpu/map_kernels.hpp"
 #include "parkin/kernels/pair_mass.hpp"
 
@@ -157,8 +158,9 @@ template <class T>
 
 // --- The interface of the kernels -------------------------------------------
 //
-// The tests reach the pair-mass kernel, its loops and their arguments through
-// these functions alone, so a change of that interface is followed here.
+// The tests reach the pair-mass kernel, its loops, the executor and their
+// arguments through these functions alone, so a change of that interface is
+// followed here.
 
 /** @brief The pair mass of two particles in (pT, eta, phi, mass), on scalars or batches. */
 template <class V>
@@ -185,6 +187,24 @@ template <class T>
 void run_block(cpu::MapBlockFunction block, std::span<const cpu::ColumnView> columns,
                std::vector<T>& out, std::size_t begin, std::size_t end) noexcept {
   block(columns.data(), reinterpret_cast<std::byte*>(out.data()), begin, end);
+}
+
+/** @brief Run the pair-mass kernel over whole columns with the map executor. */
+template <class T>
+void run_pair_mass(std::span<const cpu::ColumnView> columns, std::vector<T>& masses,
+                   const cpu::MapOptions& options) {
+  cpu::run_map(cpu::MapKernel::kPairMassPtEtaPhiM, kFloatTypeOf<T>, columns,
+               reinterpret_cast<std::byte*>(masses.data()), masses.size(), options);
+}
+
+/** @brief The pair mass of every pair, computed by the map executor. */
+template <class T>
+[[nodiscard]] std::vector<T> pair_masses_by_executor(const PairColumns<T>& pairs,
+                                                     const cpu::MapOptions& options) {
+  const std::array<cpu::ColumnView, 8> columns = kernel_columns(pairs);
+  std::vector<T> masses(pairs.size());
+  run_pair_mass<T>(columns, masses, options);
+  return masses;
 }
 
 }  // namespace parkin::tests

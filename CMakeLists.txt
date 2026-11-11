@@ -50,6 +50,7 @@ add_library(
   cpp/parkin/cpu/build_info.cpp
   cpp/parkin/cpu/cpu_features.cpp
   cpp/parkin/cpu/instruction_set.cpp
+  cpp/parkin/cpu/map_executor.cpp
   cpp/parkin/cpu/map_kernels.cpp
   cpp/parkin/cpu/thread_pool.cpp)
 target_include_directories(parkin_cpu PUBLIC cpp)
