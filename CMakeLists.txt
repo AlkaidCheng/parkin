@@ -41,6 +41,7 @@ function(parkin_set_warnings target)
   endif()
 endfunction()
 
+find_package(Threads REQUIRED)
 include(cmake/xsimd.cmake)
 
 # The host library: C++ only, with no Python or binding header.
@@ -48,9 +49,10 @@ add_library(
   parkin_cpu STATIC
   cpp/parkin/cpu/build_info.cpp
   cpp/parkin/cpu/cpu_features.cpp
-  cpp/parkin/cpu/instruction_set.cpp)
+  cpp/parkin/cpu/instruction_set.cpp
+  cpp/parkin/cpu/thread_pool.cpp)
 target_include_directories(parkin_cpu PUBLIC cpp)
-target_link_libraries(parkin_cpu PRIVATE xsimd)
+target_link_libraries(parkin_cpu PRIVATE xsimd Threads::Threads)
 target_compile_definitions(
   parkin_cpu PRIVATE PARKIN_CXX_COMPILER_ID="${CMAKE_CXX_COMPILER_ID}"
                      PARKIN_CXX_COMPILER_VERSION="${CMAKE_CXX_COMPILER_VERSION}")
