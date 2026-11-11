@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # The 1st and 15th of each month: every run installs the newest releases
+    # of the build and test tools, and the scheduled run also builds against
+    # xsimd's development branch, so a release that breaks parkin is found
+    # within two weeks.
+    - cron: "0 6 1,15 * *"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint and type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # setuptools-scm derives the version from the tag history.
+          fetch-depth: 0
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install the package with the development tools
+        run: python -m pip install ".[dev]" clang-format
+      - name: ruff
+        run: ruff check src tests
+      - name: black
+        run: black --check src tests
+      - name: mypy
+        run: mypy
+      - name: clang-format
+        run: git ls-files -z "cpp/*.hpp" "cpp/*.cpp" | xargs -0 clang-format --dry-run --Werror
+
+  test:
+    name: Test (Python ${{ matrix.python-version }} on ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Build and install with warnings as errors
+        run: >
+          python -m pip install -v ".[dev]"
+          --config-settings=cmake.define.PARKIN_WARNINGS_AS_ERRORS=ON
+      - name: pytest
+        run: pytest
+
+  xsimd-development:
+    name: Test against xsimd's development branch
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Build and install against xsimd master
+        run: >
+          python -m pip install -v ".[dev]"
+          --config-settings=cmake.define.PARKIN_XSIMD_GIT_TAG=master
+      - name: pytest
+        run: pytest

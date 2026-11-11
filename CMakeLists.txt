@@ -1,0 +1,61 @@
+# 3.26 is the first CMake whose FindPython provides Development.SABIModule,
+# the component nanobind uses for stable-ABI extension modules
+# (https://cmake.org/cmake/help/latest/module/FindPython.html).
+cmake_minimum_required(VERSION 3.26...4.3)
+
+project(parkin LANGUAGES CXX)
+
+if(NOT SKBUILD)
+  message(WARNING "\
+This CMake project is driven by scikit-build-core. Build and install it with
+  pip install .
+from the repository root rather than by running CMake directly.")
+endif()
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+option(PARKIN_WARNINGS_AS_ERRORS "Treat compiler warnings in parkin's own sources as errors" OFF)
+
+# Applies the project's warning level to a target that compiles parkin's own
+# sources.
+function(parkin_set_warnings target)
+  if(MSVC)
+    target_compile_options(${target} PRIVATE /W4)
+    if(PARKIN_WARNINGS_AS_ERRORS)
+      target_compile_options(${target} PRIVATE /WX)
+    endif()
+  else()
+    target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
+    if(PARKIN_WARNINGS_AS_ERRORS)
+      target_compile_options(${target} PRIVATE -Werror)
+    endif()
+  endif()
+endfunction()
+
+find_package(
+  Python 3.11 REQUIRED
+  COMPONENTS Interpreter Development.Module
+  OPTIONAL_COMPONENTS Development.SABIModule)
+find_package(nanobind CONFIG REQUIRED)
+include(cmake/xsimd.cmake)
+
+# The host library: C++ only, with no Python or binding header.
+add_library(parkin_cpu STATIC cpp/parkin/cpu/build_info.cpp cpp/parkin/cpu/cpu_features.cpp)
+target_include_directories(parkin_cpu PUBLIC cpp)
+target_link_libraries(parkin_cpu PRIVATE xsimd)
+target_compile_definitions(
+  parkin_cpu PRIVATE PARKIN_CXX_COMPILER_ID="${CMAKE_CXX_COMPILER_ID}"
+                     PARKIN_CXX_COMPILER_VERSION="${CMAKE_CXX_COMPILER_VERSION}")
+parkin_set_warnings(parkin_cpu)
+
+# The Python module parkin._core. STABLE_ABI takes effect on CPython 3.12 and
+# later; NB_SUPPRESS_WARNINGS keeps nanobind's headers out of parkin's warning
+# level.
+nanobind_add_module(_core STABLE_ABI NB_SUPPRESS_WARNINGS cpp/parkin/binding/module.cpp)
+target_link_libraries(_core PRIVATE parkin_cpu)
+parkin_set_warnings(_core)
+
+install(TARGETS _core LIBRARY DESTINATION parkin)

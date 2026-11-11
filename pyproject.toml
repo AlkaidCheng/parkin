@@ -1,0 +1,81 @@
+[build-system]
+# scikit-build-core drives CMake, nanobind binds the C++ core and
+# setuptools-scm derives the version from the git tags. The floor is the first
+# scikit-build-core that reads the license expression in [project]
+# (https://scikit-build-core.readthedocs.io/en/latest/about/changelog.html,
+# version 0.11.0).
+requires = ["scikit-build-core>=0.11", "nanobind", "setuptools-scm"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "parkin"
+dynamic = ["version"]
+description = "Particle kinematics on NumPy and Awkward arrays with a compiled core."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
+authors = [{ name = "Alkaid Cheng", email = "alkaidc@stanford.edu" }]
+keywords = ["high energy physics", "kinematics", "jets", "event shapes"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: C++",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Typing :: Typed",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff", "black", "mypy"]
+
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+# CMake's build tree is kept between builds, so a rebuild compiles only what
+# changed.
+build-dir = "build/{wheel_tag}"
+# One stable-ABI wheel serves CPython 3.12 and later; CPython 3.11 gets a
+# wheel of its own (https://nanobind.readthedocs.io/en/latest/packaging.html).
+wheel.py-api = "cp312"
+wheel.packages = ["src/parkin"]
+metadata.version.provider = "scikit_build_core.metadata.setuptools_scm"
+
+[tool.setuptools_scm]
+# Used where the git history is absent, as in an archive downloaded from the
+# repository host.
+fallback_version = "0.0.0"
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "SIM", "C90"]
+# Black owns line length.
+ignore = ["E501"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.isort]
+known-first-party = ["parkin"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src/parkin"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
