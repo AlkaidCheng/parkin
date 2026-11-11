@@ -10,7 +10,7 @@ build-backend = "scikit_build_core.build"
 [project]
 name = "parkin"
 dynamic = ["version"]
-description = "Particle kinematics on NumPy and Awkward arrays with a compiled core."
+description = "Kinematic observables for high-energy physics, computed on columnar arrays by a vectorised C++ core."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "BSD-3-Clause"

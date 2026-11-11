@@ -1,4 +1,4 @@
-"""Particle kinematics on NumPy and Awkward arrays with a compiled core."""
+"""Kinematic observables for high-energy physics on columnar arrays."""
 
 from importlib.metadata import version
 
