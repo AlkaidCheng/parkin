@@ -45,7 +45,7 @@ pip install git+https://github.com/AlkaidCheng/parkin.git
 |---|---|
 | Python | 3.11 or later |
 | NumPy | 1.23 or later, including NumPy 2 |
-| C++ compiler (build only) | C++20 |
+| C++ compiler (build only) | C++20; GCC 10 or later is tested |
 
 The build also needs Git. pip provides the remaining build tools, and the
 xsimd headers are downloaded when no recent copy is installed.
