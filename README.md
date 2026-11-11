@@ -1,8 +1,14 @@
 # parkin
 
-parkin (particle kinematics) is a Python library of the kinematic observables
-used in high-energy physics, from the four-momentum of a single particle to
-the shape of a whole event:
+parkin (particle kinematics) is a Python library for computing the kinematic
+observables of high-energy physics, from single-particle four-momenta to jet
+clustering, jet substructure and event shapes. Its C++ core reads columnar
+arrays in place, whether in memory or memory-mapped, and is accelerated with
+SIMD, multithreading and CUDA.
+
+## Scope
+
+Observables are grouped by the physics object they describe:
 
 - **Particles**: four-momentum components in Cartesian and collider
   coordinates (transverse momentum, pseudorapidity, rapidity, azimuthal angle,
@@ -18,11 +24,9 @@ the shape of a whole event:
 - **Tracks and calorimeter clusters**: helix and impact parameters, track
   extrapolation, cluster moments, isolation.
 
-parkin works on columnar data: arrays whose values lie in contiguous memory,
-either flat or jagged, with a variable number of entries per event. Such
-arrays may live in memory, as NumPy and Awkward arrays do, or be memory-mapped
-from a file. They are read in place, and the computation runs in a C++ core
-that is vectorised with SIMD and parallel over threads.
+The input is columnar: arrays whose values lie in contiguous memory, flat or
+jagged with a variable number of entries per event. NumPy and Awkward arrays
+are of this kind, and so are arrays memory-mapped from a file.
 
 The package is at the start of its development. It builds the compiled core
 and reports how it was built and which SIMD instruction sets the host
