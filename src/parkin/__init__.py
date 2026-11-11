@@ -1,4 +1,4 @@
-"""Kinematic observables for high-energy physics on columnar arrays."""
+"""Fast particle kinematics on arrays, computed in a vectorised C++ core."""
 
 from importlib.metadata import version
 

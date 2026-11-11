@@ -10,13 +10,22 @@ build-backend = "scikit_build_core.build"
 [project]
 name = "parkin"
 dynamic = ["version"]
-description = "Kinematic observables for high-energy physics, computed on columnar arrays by a vectorised C++ core."
+description = "Fast particle kinematics on arrays, from invariant masses and Lorentz boosts to jet clustering and event shapes, in a vectorised C++ core."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]
 authors = [{ name = "Alkaid Cheng", email = "alkaidc@stanford.edu" }]
-keywords = ["high energy physics", "kinematics", "jets", "event shapes"]
+keywords = [
+    "kinematics",
+    "four-vectors",
+    "particle physics",
+    "high energy physics",
+    "nuclear physics",
+    "astroparticle physics",
+    "jets",
+    "event shapes",
+]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
     "Intended Audience :: Science/Research",

@@ -1,10 +1,10 @@
 # parkin
 
-parkin (particle kinematics) is a Python library for computing the kinematic
-observables of high-energy physics, from single-particle four-momenta to jet
-clustering, jet substructure and event shapes. Its C++ core reads columnar
-arrays in place, whether in memory or memory-mapped, and is accelerated with
-SIMD, multithreading and CUDA.
+parkin (particle kinematics) is a fast Python library for working with
+particle momenta, from invariant masses, angular separations and Lorentz
+boosts to jet clustering and event shapes. It works directly on the arrays
+you already have (NumPy, Awkward or memory-mapped), without copying them, and
+its C++ core is accelerated with SIMD, multithreading and CUDA.
 
 ## Scope
 
