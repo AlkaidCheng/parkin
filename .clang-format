@@ -9,7 +9,7 @@ ColumnLimit: 100
 InsertBraces: true
 IncludeBlocks: Regroup
 IncludeCategories:
-  - Regex: '^<(nanobind|xsimd|Python)'
+  - Regex: '^<(catch2|nanobind|xsimd|Python)'
     Priority: 3
   - Regex: '^<.*\.h>'
     Priority: 1

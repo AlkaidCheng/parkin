@@ -1,0 +1,58 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 26,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "cpp-tests",
+      "displayName": "C++ tests of the core",
+      "description": "The core library and its C++ tests, without Python and nanobind, with warnings as errors.",
+      "binaryDir": "${sourceDir}/build/cpp-tests",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "PARKIN_BUILD_PYTHON_MODULE": "OFF",
+        "PARKIN_BUILD_TESTS": "ON",
+        "PARKIN_WARNINGS_AS_ERRORS": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "cpp-tests",
+      "configurePreset": "cpp-tests",
+      "configuration": "Release"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "cpp-tests",
+      "configurePreset": "cpp-tests",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "cpp-tests",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "cpp-tests"
+        },
+        {
+          "type": "build",
+          "name": "cpp-tests"
+        },
+        {
+          "type": "test",
+          "name": "cpp-tests"
+        }
+      ]
+    }
+  ]
+}
