@@ -43,7 +43,11 @@ find_package(nanobind CONFIG REQUIRED)
 include(cmake/xsimd.cmake)
 
 # The host library: C++ only, with no Python or binding header.
-add_library(parkin_cpu STATIC cpp/parkin/cpu/build_info.cpp cpp/parkin/cpu/cpu_features.cpp)
+add_library(
+  parkin_cpu STATIC
+  cpp/parkin/cpu/build_info.cpp
+  cpp/parkin/cpu/cpu_features.cpp
+  cpp/parkin/cpu/instruction_set.cpp)
 target_include_directories(parkin_cpu PUBLIC cpp)
 target_link_libraries(parkin_cpu PRIVATE xsimd)
 target_compile_definitions(

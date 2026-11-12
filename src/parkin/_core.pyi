@@ -6,5 +6,8 @@ def compiler() -> str:
 def detected_cpu_features() -> list[str]:
     """Return the SIMD instruction sets the running CPU supports."""
 
+def supported_instruction_sets() -> list[str]:
+    """Return the instruction sets kernels can run with, narrowest first."""
+
 def xsimd_version() -> str:
     """Return the version of the xsimd headers the core was compiled with."""
