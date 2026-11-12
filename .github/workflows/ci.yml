@@ -68,6 +68,24 @@ jobs:
       - name: pytest
         run: pytest
 
+  cpp-tests:
+    name: C++ tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    env:
+      # The hosted runners have three or four processors
+      # (https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
+      CMAKE_BUILD_PARALLEL_LEVEL: 4
+    steps:
+      - uses: actions/checkout@v7
+      # The preset builds the core and its tests without Python and nanobind,
+      # with warnings as errors, and runs the tests.
+      - name: Configure, build and run the C++ tests
+        run: cmake --workflow --preset cpp-tests
+
   oldest:
     name: Test with the oldest supported versions
     runs-on: ubuntu-latest
