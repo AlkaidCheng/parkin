@@ -3,6 +3,7 @@
 add_executable(
   parkin_cpp_tests
   test_instruction_set.cpp
+  test_map_loop.cpp
   test_math.cpp
   test_thread_pool.cpp)
 # The kernels are templates in headers that include xsimd's.

@@ -1,6 +1,6 @@
 /**
  * @file test_support.hpp
- * @brief What the tests of the kernels share.
+ * @brief What the tests of the kernels and of their loops share.
  */
 #ifndef PARKIN_TESTS_TEST_SUPPORT_HPP
 #define PARKIN_TESTS_TEST_SUPPORT_HPP
@@ -12,6 +12,8 @@
 #include <cstring>
 #include <limits>
 #include <vector>
+
+#include "parkin/cpu/column_view.hpp"
 
 namespace parkin::tests {
 
@@ -70,6 +72,15 @@ template <class T>
     largest = std::max(largest, ulp_distance(first[index], second[index]));
   }
   return largest;
+}
+
+// --- Columns ----------------------------------------------------------------
+
+/** @brief A column that reads the adjacent elements of a vector. */
+template <class T>
+[[nodiscard]] cpu::ColumnView column_of(const std::vector<T>& values) noexcept {
+  return {reinterpret_cast<const std::byte*>(values.data()),
+          static_cast<std::ptrdiff_t>(sizeof(T))};
 }
 
 }  // namespace parkin::tests
