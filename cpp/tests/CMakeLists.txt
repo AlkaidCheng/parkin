@@ -5,6 +5,7 @@ add_executable(
   test_instruction_set.cpp
   test_map_loop.cpp
   test_math.cpp
+  test_pair_mass.cpp
   test_thread_pool.cpp)
 # The kernels are templates in headers that include xsimd's.
 target_link_libraries(parkin_cpp_tests PRIVATE parkin_cpu xsimd Catch2::Catch2WithMain)

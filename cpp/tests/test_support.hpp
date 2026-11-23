@@ -11,9 +11,11 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
+#include <random>
 #include <vector>
 
 #include "parkin/cpu/column_view.hpp"
+#include "parkin/kernels/pair_mass.hpp"
 
 namespace parkin::tests {
 
@@ -26,6 +28,25 @@ template <class T>
   for (std::size_t index = 0; index < count; ++index) {
     const double fraction = static_cast<double>(index) / static_cast<double>(count - 1);
     values[index] = static_cast<T>(first + (last - first) * fraction);
+  }
+  return values;
+}
+
+/**
+ * @brief @p count pseudo-random values in [low, high), the same on every system.
+ *
+ * The standard fixes the sequence of std::mt19937 but not the results of the
+ * distributions, so its 32-bit numbers are scaled by hand.
+ */
+template <class T>
+[[nodiscard]] std::vector<T> uniform_values(std::uint32_t seed, std::size_t count, double low,
+                                            double high) {
+  constexpr double kGeneratorRange = 4294967296.0;  // 2^32
+  std::mt19937 generator(seed);
+  std::vector<T> values(count);
+  for (T& value : values) {
+    value =
+        static_cast<T>(low + (high - low) * (static_cast<double>(generator()) / kGeneratorRange));
   }
   return values;
 }
@@ -81,6 +102,59 @@ template <class T>
 [[nodiscard]] cpu::ColumnView column_of(const std::vector<T>& values) noexcept {
   return {reinterpret_cast<const std::byte*>(values.data()),
           static_cast<std::ptrdiff_t>(sizeof(T))};
+}
+
+/** @brief Pairs of particles in (pT, eta, phi, mass), one vector per component. */
+template <class T>
+struct PairColumns {
+  std::vector<T> pt1, eta1, phi1, mass1;
+  std::vector<T> pt2, eta2, phi2, mass2;
+
+  [[nodiscard]] std::size_t size() const noexcept { return pt1.size(); }
+};
+
+/**
+ * @brief @p count pairs of particles, the same on every system.
+ *
+ * Transverse momenta from 0.1 to 1000, pseudorapidities within 4, azimuthal
+ * angles within pi, and masses from 0.001 to 100 of which a third are zero.
+ */
+template <class T>
+[[nodiscard]] PairColumns<T> sample_pairs(std::size_t count) {
+  constexpr double kPi = 3.14159265358979323846;
+  const auto powers_of_ten = [count](std::uint32_t seed, double low, double high) {
+    std::vector<T> values = uniform_values<T>(seed, count, low, high);
+    for (T& value : values) {
+      value = static_cast<T>(std::pow(10.0, static_cast<double>(value)));
+    }
+    return values;
+  };
+  const auto masses = [count, &powers_of_ten](std::uint32_t seed) {
+    std::vector<T> values = powers_of_ten(seed, -3, 2);
+    for (std::size_t index = 0; index < count; index += 3) {
+      values[index] = T(0);
+    }
+    return values;
+  };
+  return {powers_of_ten(1, -1, 3),
+          uniform_values<T>(2, count, -4, 4),
+          uniform_values<T>(3, count, -kPi, kPi),
+          masses(4),
+          powers_of_ten(5, -1, 3),
+          uniform_values<T>(6, count, -4, 4),
+          uniform_values<T>(7, count, -kPi, kPi),
+          masses(8)};
+}
+
+// --- The interface of the kernels -------------------------------------------
+//
+// The tests reach the pair-mass kernel through this function alone, so a
+// change of that interface is followed here.
+
+/** @brief The pair mass of two particles in (pT, eta, phi, mass), on scalars or batches. */
+template <class V>
+[[nodiscard]] V pair_mass(V pt1, V eta1, V phi1, V mass1, V pt2, V eta2, V phi2, V mass2) noexcept {
+  return kernels::PairMassPtEtaPhiM{}(pt1, eta1, phi1, mass1, pt2, eta2, phi2, mass2);
 }
 
 }  // namespace parkin::tests
