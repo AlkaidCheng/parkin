@@ -1,0 +1,34 @@
+title: parkin
+subtitle: Particle kinematics on array data
+kicker: Documentation
+author: Alkaid Cheng
+url: https://alkaidcheng.github.io/parkin/
+repo: https://github.com/AlkaidCheng/parkin
+repo_host: GitHub
+# A page's edit link is this prefix followed by its path under book/.
+edit_url: https://github.com/AlkaidCheng/parkin/blob/main/docs/book/
+not_found_page: true
+sitemap: true
+mathjax_macros:
+  # The transverse momentum, and that of particle #1.
+  pT: p_{\mathrm{T}}
+  pTi: ['p_{\mathrm{T}#1}', 1]
+  vec: ['\boldsymbol{#1}', 1]
+  # Where a display equation may be broken on a narrow screen, inside an
+  # `aligned` environment: \nb within one formula, \ns between two formulas.
+  # On a wide screen \nb is nothing and \ns a wide space, as defined here;
+  # theme/static/narrow-equations.js turns both into a new row on a phone.
+  nb: ''
+  ns: \qquad
+
+# A part is a subject and a chapter one topic within it. Each part directory
+# needs an index.md. The chapter on the kinematic observables is a directory
+# with one page for each observable: the pull request that implements an
+# observable adds its page under book/physics/observables/ and lists it here.
+parts:
+  - dir: physics
+    title: Physics
+    chapters:
+      - dir: observables
+        sections:
+          - pair-invariant-mass.md

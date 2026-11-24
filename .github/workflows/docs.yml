@@ -1,0 +1,61 @@
+name: Documentation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Monthly, so that a new release of bookspine reaches the site and a
+    # breaking one shows early. A failed build leaves the site as it was.
+    - cron: "20 6 9 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  # Supersede stale pull-request builds, but let a running deployment finish.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: Build the documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The whole history, for the date of the last change under docs/.
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: docs/requirements.txt
+      - name: Install bookspine
+        run: python -m pip install -r docs/requirements.txt
+      # The build stops on a broken link, a missing figure, an unknown
+      # citation or equation label, and on a page that book.yaml does not list.
+      # "Revised" shows the date of the last commit under docs/, so that a
+      # scheduled build does not advance it.
+      - name: Build the site
+        run: SOURCE_DATE_EPOCH=$(git log -1 --format=%ct -- docs) bookspine build docs
+      - if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs/site
+
+  deploy:
+    name: Publish to GitHub Pages
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
