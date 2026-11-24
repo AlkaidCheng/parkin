@@ -3,6 +3,7 @@
 from importlib.metadata import version
 
 from parkin._execution import ExecutionSettings, execution, get_execution
+from parkin._pair import invariant_mass
 from parkin._system_info import SystemInfo, system_info
 from parkin.particles import Particles, as_particles
 
@@ -16,5 +17,6 @@ __all__ = [
     "as_particles",
     "execution",
     "get_execution",
+    "invariant_mass",
     "system_info",
 ]

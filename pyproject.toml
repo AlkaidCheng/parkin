@@ -54,7 +54,8 @@ classifiers = [
 dependencies = ["numpy>=1.23.2"]
 
 [project.optional-dependencies]
-dev = ["pytest", "ruff", "black", "mypy"]
+# mpmath and vector are the references the tests compare results with.
+dev = ["pytest", "ruff", "black", "mypy", "mpmath", "vector"]
 
 [project.urls]
 Repository = "https://github.com/AlkaidCheng/parkin"
