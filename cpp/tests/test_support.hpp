@@ -6,15 +6,19 @@
 #define PARKIN_TESTS_TEST_SUPPORT_HPP
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <limits>
 #include <random>
+#include <span>
 #include <vector>
 
 #include "parkin/cpu/column_view.hpp"
+#include "parkin/cpu/instruction_set.hpp"
+#include "parkin/cpu/map_kernels.hpp"
 #include "parkin/kernels/pair_mass.hpp"
 
 namespace parkin::tests {
@@ -97,6 +101,11 @@ template <class T>
 
 // --- Columns ----------------------------------------------------------------
 
+/** @brief The FloatType of the element type T, which is float or double. */
+template <class T>
+inline constexpr cpu::FloatType kFloatTypeOf =
+    sizeof(T) == sizeof(float) ? cpu::FloatType::kFloat32 : cpu::FloatType::kFloat64;
+
 /** @brief A column that reads the adjacent elements of a vector. */
 template <class T>
 [[nodiscard]] cpu::ColumnView column_of(const std::vector<T>& values) noexcept {
@@ -148,13 +157,34 @@ template <class T>
 
 // --- The interface of the kernels -------------------------------------------
 //
-// The tests reach the pair-mass kernel through this function alone, so a
-// change of that interface is followed here.
+// The tests reach the pair-mass kernel, its loops and their arguments through
+// these functions alone, so a change of that interface is followed here.
 
 /** @brief The pair mass of two particles in (pT, eta, phi, mass), on scalars or batches. */
 template <class V>
 [[nodiscard]] V pair_mass(V pt1, V eta1, V phi1, V mass1, V pt2, V eta2, V phi2, V mass2) noexcept {
   return kernels::PairMassPtEtaPhiM{}(pt1, eta1, phi1, mass1, pt2, eta2, phi2, mass2);
+}
+
+/** @brief The columns of pairs, in the order the loops of the pair-mass kernel read them. */
+template <class T>
+[[nodiscard]] std::array<cpu::ColumnView, 8> kernel_columns(const PairColumns<T>& pairs) noexcept {
+  return {column_of(pairs.pt1),   column_of(pairs.eta1), column_of(pairs.phi1),
+          column_of(pairs.mass1), column_of(pairs.pt2),  column_of(pairs.eta2),
+          column_of(pairs.phi2),  column_of(pairs.mass2)};
+}
+
+/** @brief The loop of the pair-mass kernel for an element type and an instruction set. */
+[[nodiscard]] inline cpu::MapBlockFunction pair_mass_block(cpu::FloatType float_type,
+                                                           cpu::InstructionSet instruction_set) {
+  return cpu::map_block_function(cpu::MapKernel::kPairMassPtEtaPhiM, float_type, instruction_set);
+}
+
+/** @brief Apply a loop to the elements [begin, end) of columns and write the results to @p out. */
+template <class T>
+void run_block(cpu::MapBlockFunction block, std::span<const cpu::ColumnView> columns,
+               std::vector<T>& out, std::size_t begin, std::size_t end) noexcept {
+  block(columns.data(), reinterpret_cast<std::byte*>(out.data()), begin, end);
 }
 
 }  // namespace parkin::tests
