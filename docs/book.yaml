@@ -14,12 +14,6 @@ mathjax_macros:
   pT: p_{\mathrm{T}}
   pTi: ['p_{\mathrm{T}#1}', 1]
   vec: ['\boldsymbol{#1}', 1]
-  # Where a display equation may be broken on a narrow screen, inside an
-  # `aligned` environment: \nb within one formula, \ns between two formulas.
-  # On a wide screen \nb is nothing and \ns a wide space, as defined here;
-  # theme/static/narrow-equations.js turns both into a new row on a phone.
-  nb: ''
-  ns: \qquad
 
 # A part is a subject and a chapter one topic within it. Each part directory
 # needs an index.md. The chapter on the kinematic observables is a directory

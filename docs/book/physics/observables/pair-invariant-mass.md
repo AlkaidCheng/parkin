@@ -25,7 +25,7 @@ given by their transverse momentum, pseudorapidity, azimuthal angle and mass.
     $$
     \begin{aligned}
     & m_{12}^2 = (p_1 + p_2)^2
-    \nb = (E_1 + E_2)^2 - |\vec{p}_1 + \vec{p}_2|^2 .
+    \narrowbreak = (E_1 + E_2)^2 - |\vec{p}_1 + \vec{p}_2|^2 .
     \end{aligned}
     \label{eq:pair-mass-definition}
     $$
@@ -35,7 +35,7 @@ Expanding the square and using $\eqref{eq:mass-shell}$ for each particle gives
 $$
 \begin{aligned}
 & m_{12}^2 = m_1^2 + m_2^2
-\nb + 2 \left( E_1 E_2 - \vec{p}_1 \cdot \vec{p}_2 \right) .
+\narrowbreak + 2 \left( E_1 E_2 - \vec{p}_1 \cdot \vec{p}_2 \right) .
 \end{aligned}
 \label{eq:pair-mass-expanded}
 $$
@@ -48,8 +48,8 @@ the sum of two terms,
 $$
 \begin{aligned}
 & E_1 E_2 - \vec{p}_1 \cdot \vec{p}_2
-\nb = \left( E_1 E_2 - |\vec{p}_1| |\vec{p}_2| \right)
-\nb + \left( |\vec{p}_1| |\vec{p}_2| - \vec{p}_1 \cdot \vec{p}_2 \right) .
+\narrowbreak = \left( E_1 E_2 - |\vec{p}_1| |\vec{p}_2| \right)
+\narrowbreak + \left( |\vec{p}_1| |\vec{p}_2| - \vec{p}_1 \cdot \vec{p}_2 \right) .
 \end{aligned}
 \label{eq:pair-mass-two-terms}
 $$
@@ -71,7 +71,7 @@ $\eqref{eq:momentum-magnitude}$,
 $$
 \begin{aligned}
 \vec{p}_1 \cdot \vec{p}_2 &= \pTi{1} \pTi{2}
-\bigl[ \cos\Delta\phi \nb + \sinh\eta_1 \sinh\eta_2 \bigr] , \\
+\bigl[ \cos\Delta\phi \narrowbreak + \sinh\eta_1 \sinh\eta_2 \bigr] , \\
 |\vec{p}_1| |\vec{p}_2| &= \pTi{1} \pTi{2} \cosh\eta_1 \cosh\eta_2 .
 \end{aligned}
 \label{eq:pair-products}
@@ -85,7 +85,7 @@ angular term is therefore
 $$
 \begin{aligned}
 & |\vec{p}_1| |\vec{p}_2| - \vec{p}_1 \cdot \vec{p}_2
-\nb = \pTi{1} \pTi{2} \left( \cosh\Delta\eta - \cos\Delta\phi \right) .
+\narrowbreak = \pTi{1} \pTi{2} \left( \cosh\Delta\eta - \cos\Delta\phi \right) .
 \end{aligned}
 \label{eq:angular-term-difference}
 $$
@@ -98,8 +98,8 @@ common part:
 $$
 \begin{aligned}
 & |\vec{p}_1| |\vec{p}_2| - \vec{p}_1 \cdot \vec{p}_2
-\nb = 2 \, \pTi{1} \pTi{2}
-\Bigl( \sinh^2 \frac{\Delta\eta}{2} \nb + \sin^2 \frac{\Delta\phi}{2} \Bigr) .
+\narrowbreak = 2 \, \pTi{1} \pTi{2}
+\Bigl( \sinh^2 \frac{\Delta\eta}{2} \narrowbreak + \sin^2 \frac{\Delta\phi}{2} \Bigr) .
 \end{aligned}
 \label{eq:angular-term}
 $$
@@ -120,7 +120,7 @@ Writing each energy as $E = |\vec{p}| + d$ turns the energy term into
 $$
 \begin{aligned}
 & E_1 E_2 - |\vec{p}_1| |\vec{p}_2|
-\nb = |\vec{p}_1| \, d_2 + |\vec{p}_2| \, d_1 + d_1 d_2 .
+\narrowbreak = |\vec{p}_1| \, d_2 + |\vec{p}_2| \, d_1 + d_1 d_2 .
 \end{aligned}
 \label{eq:energy-term}
 $$
@@ -133,9 +133,9 @@ $\eqref{eq:pair-mass-expanded}$ by way of $\eqref{eq:pair-mass-two-terms}$ gives
 $$
 \begin{aligned}
 m_{12}^2 = {} & m_1^2 + m_2^2
-\nb + 2 \left( |\vec{p}_1| \, d_2 + |\vec{p}_2| \, d_1 + d_1 d_2 \right) \\
+\narrowbreak + 2 \left( |\vec{p}_1| \, d_2 + |\vec{p}_2| \, d_1 + d_1 d_2 \right) \\
 & {} + 4 \, \pTi{1} \pTi{2}
-\Bigl( \sinh^2 \frac{\Delta\eta}{2} \nb + \sin^2 \frac{\Delta\phi}{2} \Bigr) ,
+\Bigl( \sinh^2 \frac{\Delta\eta}{2} \narrowbreak + \sin^2 \frac{\Delta\phi}{2} \Bigr) ,
 \end{aligned}
 \label{eq:pair-mass}
 $$
@@ -145,8 +145,8 @@ where each particle contributes
 $$
 \begin{aligned}
 & |\vec{p}| = \pT \cosh\eta ,
-\ns E = \sqrt{m^2 + |\vec{p}|^2} ,
-\ns d = \frac{m^2}{E + |\vec{p}|} .
+\narrowsep E = \sqrt{m^2 + |\vec{p}|^2} ,
+\narrowsep d = \frac{m^2}{E + |\vec{p}|} .
 \end{aligned}
 \label{eq:pair-mass-inputs}
 $$

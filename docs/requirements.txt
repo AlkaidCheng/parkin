@@ -1,3 +1,3 @@
-# The generator and theme of the documentation site. 0.3.1 is the oldest
-# release the site has been built with.
-bookspine>=0.3.1
+# The generator and theme of the documentation site. 0.4.0 is the first
+# release with the marks \narrowbreak and \narrowsep, which the equations use.
+bookspine>=0.4.0
