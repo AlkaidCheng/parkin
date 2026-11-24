@@ -34,8 +34,8 @@ $z$ axis:
 $$
 \begin{aligned}
 & \pT = \sqrt{p_x^2 + p_y^2} ,
-\ns \phi = \operatorname{atan2}(p_y, p_x) ,
-\ns \eta = \operatorname{asinh} \frac{p_z}{\pT} = -\ln \tan \frac{\theta}{2} .
+\narrowsep \phi = \operatorname{atan2}(p_y, p_x) ,
+\narrowsep \eta = \operatorname{asinh} \frac{p_z}{\pT} = -\ln \tan \frac{\theta}{2} .
 \end{aligned}
 \label{eq:collider-coordinates}
 $$
@@ -45,8 +45,8 @@ Conversely,
 $$
 \begin{aligned}
 & p_x = \pT \cos\phi ,
-\ns p_y = \pT \sin\phi ,
-\ns p_z = \pT \sinh\eta ,
+\narrowsep p_y = \pT \sin\phi ,
+\narrowsep p_z = \pT \sinh\eta ,
 \end{aligned}
 \label{eq:cartesian-components}
 $$
