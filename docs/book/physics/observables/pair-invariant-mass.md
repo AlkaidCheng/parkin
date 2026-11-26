@@ -231,3 +231,58 @@ The definition leaves some inputs open. The library treats them as ROOT
 | A NaN in any component | Gives NaN. |
 
 Table: Conventions for the inputs that the definition of the pair mass leaves open.
+
+## Computing it
+
+The function `parkin.invariant_mass` evaluates $\eqref{eq:pair-mass}$ for each
+pair that two sets of particles of one length form:
+
+```python
+import numpy as np
+import parkin
+
+mu1 = parkin.Particles(
+    pt=np.array([45.0, 38.2]),
+    eta=np.array([0.3, -1.2]),
+    phi=np.array([0.1, 2.9]),
+    mass=np.array([0.106, 0.106]),
+)
+mu2 = parkin.Particles(
+    pt=np.array([41.5, 27.9]),
+    eta=np.array([-0.4, -1.0]),
+    phi=np.array([3.0, -0.4]),
+    mass=np.array([0.106, 0.106]),
+)
+
+print(parkin.invariant_mass(mu1, mu2))
+```
+
+```
+[91.18459273 65.41600255]
+```
+
+The components are arrays of one floating-point type, single or double
+precision. The formula is evaluated in that type, and the masses are returned
+in it. Given a single set of particles, the function returns the mass of each
+of them.
+
+## Measured accuracy
+
+The error of a result is its distance from the exact mass of the same
+floating-point inputs, which is computed with 60 digits. It is given in units
+in the last place (ULP), the spacing of the floating-point numbers at the size
+of the result [@goldberg1991]. For non-negative masses, $|\eta| \le 5$ and
+$|\Delta\phi| \le \pi$, every result lies within 8 ULP of the exact mass, and
+the tests of the library hold each supported instruction set to that bound.
+
+| Pairs | Double precision | Single precision |
+|---|---|---|
+| Unrelated particles | 5.5 | 6.0 |
+| Nearly collinear, down to a separation of $10^{-7}$ in double and $10^{-4}$ in single precision | 2.1 | 3.3 |
+| A soft particle with a hard one, with a ratio of transverse momenta from $10^{-8}$ to $10^{-3}$ | 5.7 | 5.9 |
+| Two heavy particles nearly at rest, with masses from 10 to 1000 and transverse momenta below 1 | 2.2 | 2.7 |
+
+Table: Largest error of the pair mass in ULP, over 20,000 pairs of each kind and over the scalar and the SIMD loop of a 64-bit Arm processor.
+
+Two azimuthal angles on either side of $\pm\pi$ are outside this statement,
+for the reason given in the remark above.
