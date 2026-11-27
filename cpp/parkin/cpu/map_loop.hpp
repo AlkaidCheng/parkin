@@ -2,9 +2,10 @@
  * @file map_loop.hpp
  * @brief The loop that applies a map kernel to a range of elements.
  *
- * A map kernel gives one output element per input element. The kernel is a
- * formula on values; this file supplies the loads, the stores and the loop,
- * once for scalars and once for the SIMD batches of an instruction set.
+ * A map kernel gives one element of each of its outputs per input element.
+ * The kernel is a formula on values; this file supplies the loads, the stores
+ * and the loop, once for scalars and once for the SIMD batches of an
+ * instruction set.
  */
 #ifndef PARKIN_CPU_MAP_LOOP_HPP
 #define PARKIN_CPU_MAP_LOOP_HPP
@@ -84,12 +85,12 @@ void copy_column(const std::byte* first, std::ptrdiff_t stride, std::size_t coun
   }
 }
 
-/** @brief Apply a kernel to the vectors that start @p offset elements into each source. */
-template <class Kernel, class Lanes, std::size_t... Index>
-[[nodiscard]] typename Lanes::Vector apply_kernel(
+/** @brief The vectors that start @p offset elements into each source. */
+template <class Lanes, std::size_t... Index>
+[[nodiscard]] std::array<typename Lanes::Vector, sizeof...(Index)> load_vectors(
     const std::array<const typename Lanes::Scalar*, sizeof...(Index)>& sources, std::size_t offset,
     std::index_sequence<Index...> /*indices*/) noexcept {
-  return Kernel{}(Lanes::load(sources[Index] + offset)...);
+  return {Lanes::load(sources[Index] + offset)...};
 }
 
 }  // namespace detail
@@ -98,31 +99,36 @@ template <class Kernel, class Lanes, std::size_t... Index>
  * @brief Apply a map kernel to the elements [begin, end) of its input columns.
  *
  * Whole chunks are loaded in place from columns that allow it and stored
- * straight to the output. Other columns, and the last chunk when it is
+ * straight to the outputs. Other columns, and the last chunk when it is
  * partial, go through scratch memory on the stack; a partial chunk is padded
  * to a whole vector with copies of its last element, so every element is
  * computed by the same vector code.
  *
- * @tparam Kernel A kernel with a constant kInputCount and a call operator
- *                that takes kInputCount values and returns one.
+ * @tparam Kernel A kernel with the constants kInputCount and kOutputCount and
+ *                a call operator that takes an array of kInputCount values
+ *                and returns an array of kOutputCount values.
  * @tparam Lanes ScalarLanes or SimdLanes for the element type.
  * @param inputs Kernel::kInputCount columns of at least @p end elements.
- * @param out Adjacent elements of the element type, aligned for it, of which
- *            [begin, end) are written. It must not overlap an input.
+ * @param outputs Kernel::kOutputCount pointers, each to adjacent elements of
+ *                the element type, aligned for it, of which [begin, end) are
+ *                written. An output must overlap neither an input nor
+ *                another output.
  * @param begin First element to compute, a multiple of kMapChunkSize.
  * @param end One past the last element to compute.
  */
 template <class Kernel, class Lanes>
-void map_block(const ColumnView* inputs, std::byte* out, std::size_t begin,
+void map_block(const ColumnView* inputs, std::byte* const* outputs, std::size_t begin,
                std::size_t end) noexcept {
   using T = typename Lanes::Scalar;
   constexpr std::size_t kInputCount = Kernel::kInputCount;
+  constexpr std::size_t kOutputCount = Kernel::kOutputCount;
   constexpr std::size_t kLaneCount = Lanes::kLaneCount;
   static_assert(kMapChunkSize % kLaneCount == 0, "a chunk must hold a whole number of vectors");
 
   std::array<std::array<T, kMapChunkSize>, kInputCount> input_scratch{};
-  std::array<T, kMapChunkSize> output_scratch{};
+  std::array<std::array<T, kMapChunkSize>, kOutputCount> output_scratch{};
   std::array<const T*, kInputCount> sources{};
+  std::array<T*, kOutputCount> targets{};
 
   for (std::size_t chunk_begin = begin; chunk_begin < end; chunk_begin += kMapChunkSize) {
     const std::size_t count = std::min(kMapChunkSize, end - chunk_begin);
@@ -142,14 +148,22 @@ void map_block(const ColumnView* inputs, std::byte* out, std::size_t begin,
       sources[column] = scratch;
     }
 
-    T* target = is_whole_chunk ? reinterpret_cast<T*>(out) + chunk_begin : output_scratch.data();
+    for (std::size_t output = 0; output < kOutputCount; ++output) {
+      targets[output] = is_whole_chunk ? reinterpret_cast<T*>(outputs[output]) + chunk_begin
+                                       : output_scratch[output].data();
+    }
     for (std::size_t offset = 0; offset < padded_count; offset += kLaneCount) {
-      Lanes::store(detail::apply_kernel<Kernel, Lanes>(sources, offset,
-                                                       std::make_index_sequence<kInputCount>{}),
-                   target + offset);
+      const std::array<typename Lanes::Vector, kOutputCount> results = Kernel{}(
+          detail::load_vectors<Lanes>(sources, offset, std::make_index_sequence<kInputCount>{}));
+      for (std::size_t output = 0; output < kOutputCount; ++output) {
+        Lanes::store(results[output], targets[output] + offset);
+      }
     }
     if (!is_whole_chunk) {
-      std::memcpy(out + chunk_begin * sizeof(T), output_scratch.data(), count * sizeof(T));
+      for (std::size_t output = 0; output < kOutputCount; ++output) {
+        std::memcpy(outputs[output] + chunk_begin * sizeof(T), output_scratch[output].data(),
+                    count * sizeof(T));
+      }
     }
   }
 }

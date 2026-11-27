@@ -37,11 +37,25 @@ using parkin::tests::column_of;
  */
 struct PositionalSum {
   static constexpr std::size_t kInputCount = 3;
+  static constexpr std::size_t kOutputCount = 1;
 
   template <class V>
-  [[nodiscard]] V operator()(V a, V b, V c) const noexcept {
+  [[nodiscard]] std::array<V, kOutputCount> operator()(
+      const std::array<V, kInputCount>& values) const noexcept {
     using T = parkin::math::ScalarType<V>;
-    return a + V(T(64)) * b + V(T(4096)) * c;
+    return {values[0] + V(T(64)) * values[1] + V(T(4096)) * values[2]};
+  }
+};
+
+/** @brief A kernel with two outputs: a + b and a - b. */
+struct SumAndDifference {
+  static constexpr std::size_t kInputCount = 2;
+  static constexpr std::size_t kOutputCount = 2;
+
+  template <class V>
+  [[nodiscard]] std::array<V, kOutputCount> operator()(
+      const std::array<V, kInputCount>& values) const noexcept {
+    return {values[0] + values[1], values[0] - values[1]};
   }
 };
 
@@ -64,7 +78,7 @@ struct Columns {
   [[nodiscard]] std::vector<T> sums() const {
     std::vector<T> result(a.size());
     for (std::size_t index = 0; index < a.size(); ++index) {
-      result[index] = PositionalSum{}(a[index], b[index], c[index]);
+      result[index] = PositionalSum{}(std::array<T, 3>{a[index], b[index], c[index]})[0];
     }
     return result;
   }
@@ -76,8 +90,8 @@ struct Columns {
 template <class Lanes>
 void run(std::span<const ColumnView, 3> columns, std::vector<typename Lanes::Scalar>& out,
          std::size_t begin, std::size_t end) noexcept {
-  parkin::cpu::map_block<PositionalSum, Lanes>(
-      columns.data(), reinterpret_cast<std::byte*>(out.data()), begin, end);
+  std::byte* const output = reinterpret_cast<std::byte*>(out.data());
+  parkin::cpu::map_block<PositionalSum, Lanes>(columns.data(), &output, begin, end);
 }
 
 /// The loop for one element at a time and for one batch at a time, in each precision.
@@ -206,6 +220,29 @@ TEMPLATE_LIST_TEST_CASE("A stride of zero repeats one value", "[map_loop]", Lane
 
   columns.b.assign(kCount, repeated);
   CHECK(out == columns.sums());
+}
+
+TEMPLATE_LIST_TEST_CASE("A kernel with several outputs writes each to its own array", "[map_loop]",
+                        LanesTypes) {
+  using T = typename TestType::Scalar;
+  constexpr std::size_t kCount = 600;
+  const Columns<T> columns(kCount);
+  const std::array<ColumnView, 2> views{column_of(columns.a), column_of(columns.b)};
+  std::vector<T> sums(kCount, T(-1));
+  std::vector<T> differences(kCount, T(-1));
+  const std::array<std::byte*, 2> outputs{reinterpret_cast<std::byte*>(sums.data()),
+                                          reinterpret_cast<std::byte*>(differences.data())};
+
+  parkin::cpu::map_block<SumAndDifference, TestType>(views.data(), outputs.data(), 0, kCount);
+
+  std::vector<T> expected_sums(kCount);
+  std::vector<T> expected_differences(kCount);
+  for (std::size_t index = 0; index < kCount; ++index) {
+    expected_sums[index] = columns.a[index] + columns.b[index];
+    expected_differences[index] = columns.a[index] - columns.b[index];
+  }
+  CHECK(sums == expected_sums);
+  CHECK(differences == expected_differences);
 }
 
 }  // namespace

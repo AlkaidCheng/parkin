@@ -42,7 +42,7 @@ void run_map(MapKernel kernel, FloatType float_type, std::span<const ColumnView>
       [run_block, columns, out, element_count, block_size](std::size_t block) {
         const std::size_t begin = block * block_size;
         const std::size_t end = std::min(element_count, begin + block_size);
-        run_block(columns, out, begin, end);
+        run_block(columns, &out, begin, end);
       });
 }
 

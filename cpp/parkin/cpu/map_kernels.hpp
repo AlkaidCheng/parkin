@@ -31,8 +31,8 @@ enum class FloatType : std::uint8_t {
  *
  * The arguments are those of map_block() in map_loop.hpp.
  */
-using MapBlockFunction = void (*)(const ColumnView* inputs, std::byte* out, std::size_t begin,
-                                  std::size_t end) noexcept;
+using MapBlockFunction = void (*)(const ColumnView* inputs, std::byte* const* outputs,
+                                  std::size_t begin, std::size_t end) noexcept;
 
 /** @brief Find a map kernel by name, or nothing when no kernel has that name. */
 [[nodiscard]] std::optional<MapKernel> find_map_kernel(std::string_view name) noexcept;
