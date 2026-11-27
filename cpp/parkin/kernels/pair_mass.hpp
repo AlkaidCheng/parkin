@@ -5,6 +5,7 @@
 #ifndef PARKIN_KERNELS_PAIR_MASS_HPP
 #define PARKIN_KERNELS_PAIR_MASS_HPP
 
+#include <array>
 #include <cstddef>
 
 #include "parkin/kernels/math.hpp"
@@ -34,19 +35,29 @@ namespace parkin::kernels {
 struct PairMassPtEtaPhiM {
   /** @brief Number of input columns: four per particle. */
   static constexpr std::size_t kInputCount = 8;
+  /** @brief Number of output columns. */
+  static constexpr std::size_t kOutputCount = 1;
 
   /**
    * @tparam V A floating-point scalar or an xsimd batch of one.
-   * @param pt1,pt2 Transverse momenta, non-negative.
-   * @param eta1,eta2 Pseudorapidities.
-   * @param phi1,phi2 Azimuthal angles in radians, in any range.
-   * @param mass1,mass2 Masses, in the unit of the transverse momenta.
+   * @param components (pT, eta, phi, mass) of the first particle, then of the
+   *                   second: transverse momenta, non-negative;
+   *                   pseudorapidities; azimuthal angles in radians, in any
+   *                   range; masses, in the unit of the transverse momenta.
    * @return The invariant mass of the pair, in the same unit.
    */
   template <class V>
-  [[nodiscard]] V operator()(V pt1, V eta1, V phi1, V mass1, V pt2, V eta2, V phi2,
-                             V mass2) const noexcept {
+  [[nodiscard]] std::array<V, kOutputCount> operator()(
+      const std::array<V, kInputCount>& components) const noexcept {
     using T = math::ScalarType<V>;
+    const V pt1 = components[0];
+    const V eta1 = components[1];
+    const V phi1 = components[2];
+    const V mass1 = components[3];
+    const V pt2 = components[4];
+    const V eta2 = components[5];
+    const V phi2 = components[6];
+    const V mass2 = components[7];
     const V zero(T(0));
     const V half(T(0.5));
 
@@ -83,7 +94,7 @@ struct PairMassPtEtaPhiM {
 
     const V dot_product = magnitude_term + (angle_term + angle_term);
     const V mass_squared = mass1_squared + mass2_squared + (dot_product + dot_product);
-    return math::copysign(math::sqrt(math::abs(mass_squared)), mass_squared);
+    return {math::copysign(math::sqrt(math::abs(mass_squared)), mass_squared)};
   }
 };
 

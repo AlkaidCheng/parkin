@@ -165,7 +165,8 @@ template <class T>
 /** @brief The pair mass of two particles in (pT, eta, phi, mass), on scalars or batches. */
 template <class V>
 [[nodiscard]] V pair_mass(V pt1, V eta1, V phi1, V mass1, V pt2, V eta2, V phi2, V mass2) noexcept {
-  return kernels::PairMassPtEtaPhiM{}(pt1, eta1, phi1, mass1, pt2, eta2, phi2, mass2);
+  return kernels::PairMassPtEtaPhiM{}(
+      std::array<V, 8>{pt1, eta1, phi1, mass1, pt2, eta2, phi2, mass2})[0];
 }
 
 /** @brief The columns of pairs, in the order the loops of the pair-mass kernel read them. */
@@ -186,7 +187,8 @@ template <class T>
 template <class T>
 void run_block(cpu::MapBlockFunction block, std::span<const cpu::ColumnView> columns,
                std::vector<T>& out, std::size_t begin, std::size_t end) noexcept {
-  block(columns.data(), reinterpret_cast<std::byte*>(out.data()), begin, end);
+  std::byte* const output = reinterpret_cast<std::byte*>(out.data());
+  block(columns.data(), &output, begin, end);
 }
 
 /** @brief Run the pair-mass kernel over whole columns with the map executor. */
