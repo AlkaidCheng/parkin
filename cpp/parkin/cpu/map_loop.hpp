@@ -21,6 +21,20 @@
 
 #include "parkin/cpu/column_view.hpp"
 
+/**
+ * @brief Marks a function into which every call it makes is inlined.
+ *
+ * A kernel is composed of small function templates, and GCC leaves some of
+ * them as calls inside the loop, where each costs a transfer of its vector
+ * arguments through memory. MSVC has no such attribute and decides by
+ * itself.
+ */
+#if defined(__GNUC__) || defined(__clang__)
+#define PARKIN_FLATTEN [[gnu::flatten]]
+#else
+#define PARKIN_FLATTEN
+#endif
+
 namespace parkin::cpu {
 
 /**
@@ -117,8 +131,8 @@ template <class Lanes, std::size_t... Index>
  * @param end One past the last element to compute.
  */
 template <class Kernel, class Lanes>
-void map_block(const ColumnView* inputs, std::byte* const* outputs, std::size_t begin,
-               std::size_t end) noexcept {
+PARKIN_FLATTEN void map_block(const ColumnView* inputs, std::byte* const* outputs,
+                              std::size_t begin, std::size_t end) noexcept {
   using T = typename Lanes::Scalar;
   constexpr std::size_t kInputCount = Kernel::kInputCount;
   constexpr std::size_t kOutputCount = Kernel::kOutputCount;

@@ -18,7 +18,8 @@
  * A kernel names no coordinate system. It is a template on the systems of its
  * arguments and is written with the functions of this file, which are
  * overloaded on the chart. A function of one chart costs what that chart
- * needs.
+ * needs, and a function of two charts uses a closed form where both
+ * particles are given in the same angle.
  */
 #ifndef PARKIN_KERNELS_COORDINATES_HPP
 #define PARKIN_KERNELS_COORDINATES_HPP
@@ -269,6 +270,88 @@ template <class V>
   const V energy_minus_momentum = temporal.energy - momentum;
   return {temporal.energy, energy_minus_momentum,
           energy_minus_momentum * (temporal.energy + momentum)};
+}
+
+// --- Two particles ----------------------------------------------------------
+//
+// |p1| |p2| - p1.p2, which is |p1| |p2| (1 - cos(opening angle)), is the sum
+// of two non-negative gaps, one for each spatial part:
+//
+//   azimuthal     pT1 pT2 - pT1.pT2            = pT1 pT2 (1 - cos(phi1 - phi2))
+//   longitudinal  |p1| |p2| - pT1 pT2 - pz1 pz2 = pT1 pT2 (cosh(eta1 - eta2) - 1)
+//
+// Each is |u| |v| - u.v for two vectors of a plane: the transverse momenta,
+// and the vectors (pT, pz).
+
+namespace detail {
+
+/**
+ * @brief |u| |v| - u.v for two vectors of a plane, from their components and magnitudes.
+ *
+ * By Lagrange's identity (|u| |v|)^2 - (u.v)^2 is the square of the cross
+ * product u1 v2 - u2 v1. For u.v > 0 the gap is therefore that square over
+ * |u| |v| + u.v, and for u.v <= 0 it is the sum |u| |v| + |u.v|. Neither
+ * subtracts nearly equal numbers outside the cross product, whose precision
+ * is that of the components.
+ */
+template <class V>
+[[nodiscard]] V planar_gap(V u1, V u2, V u_magnitude, V v1, V v2, V v_magnitude) noexcept {
+  const V zero(math::ScalarType<V>(0));
+  const V dot_product = u1 * v1 + u2 * v2;
+  const V cross_product = u1 * v2 - u2 * v1;
+  const V magnitude_product = u_magnitude * v_magnitude;
+  return math::select(dot_product > zero,
+                      cross_product * cross_product / (magnitude_product + dot_product),
+                      magnitude_product - dot_product);
+}
+
+}  // namespace detail
+
+/**
+ * @brief pT1 pT2 - pT1.pT2 for two particles of transverse momenta @p pt1 and @p pt2.
+ *
+ * Two azimuthal angles give the closed form 2 pT1 pT2 sin^2((phi1 - phi2) / 2),
+ * in which the difference of two nearby angles is exact.
+ */
+template <class V>
+[[nodiscard]] V azimuthal_gap(const PtPhi<V>& first, V pt1, const PtPhi<V>& second,
+                              V pt2) noexcept {
+  const V half(math::ScalarType<V>(0.5));
+  const V sine = math::sin(half * (first.phi - second.phi));
+  const V half_gap = (pt1 * pt2) * (sine * sine);
+  return half_gap + half_gap;
+}
+
+template <class Azimuthal1, class Azimuthal2, class V>
+[[nodiscard]] V azimuthal_gap(const Azimuthal1& first, V pt1, const Azimuthal2& second,
+                              V pt2) noexcept {
+  const PxPy<V> u = cartesian(first);
+  const PxPy<V> v = cartesian(second);
+  return detail::planar_gap(u.px, u.py, pt1, v.px, v.py, pt2);
+}
+
+/**
+ * @brief |p1| |p2| - pT1 pT2 - pz1 pz2 for two particles of transverse momenta
+ *        @p pt1, @p pt2 and momenta of magnitudes @p momentum1, @p momentum2.
+ *
+ * Two pseudorapidities give the closed form
+ * 2 pT1 pT2 sinh^2((eta1 - eta2) / 2), in which the difference of two nearby
+ * pseudorapidities is exact.
+ */
+template <class V>
+[[nodiscard]] V longitudinal_gap(const Eta<V>& first, V pt1, V /*momentum1*/, const Eta<V>& second,
+                                 V pt2, V /*momentum2*/) noexcept {
+  const V half(math::ScalarType<V>(0.5));
+  const V hyperbolic_sine = math::sinh(half * (first.eta - second.eta));
+  const V half_gap = (pt1 * pt2) * (hyperbolic_sine * hyperbolic_sine);
+  return half_gap + half_gap;
+}
+
+template <class Longitudinal1, class Longitudinal2, class V>
+[[nodiscard]] V longitudinal_gap(const Longitudinal1& first, V pt1, V momentum1,
+                                 const Longitudinal2& second, V pt2, V momentum2) noexcept {
+  return detail::planar_gap(pt1, longitudinal_momentum(first, pt1), momentum1, pt2,
+                            longitudinal_momentum(second, pt2), momentum2);
 }
 
 // --- Conversion -------------------------------------------------------------
