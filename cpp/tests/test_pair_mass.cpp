@@ -2,17 +2,24 @@
  * @file test_pair_mass.cpp
  * @brief Tests of the kernel for the invariant mass of a pair of particles.
  */
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <string>
+#include <string_view>
+#include <tuple>
+#include <type_traits>
 #include <vector>
 
 #include <catch2/catch_template_test_macros.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <xsimd/xsimd.hpp>
 
+#include "parkin/kernels/coordinates.hpp"
+#include "parkin/kernels/pair_mass.hpp"
 #include "test_support.hpp"
 
 namespace {
@@ -166,6 +173,284 @@ TEMPLATE_TEST_CASE("The kernel gives the same mass on a batch as on a scalar", "
   const PairColumns<TestType> pairs = sample_pairs<TestType>(2048);
 
   CHECK(largest_ulp_distance(masses_on_batches(pairs), masses_on_scalars(pairs)) <= kBatchUlpBound);
+}
+
+// --- Coordinate systems -----------------------------------------------------
+
+using parkin::kernels::Coordinates;
+using parkin::kernels::Energy;
+using parkin::kernels::Eta;
+using parkin::kernels::Mass;
+using parkin::kernels::PairMass;
+using parkin::kernels::PtPhi;
+using parkin::kernels::PxPy;
+using parkin::kernels::Pz;
+
+/// The eight coordinate systems: one chart of each part of a four-momentum.
+using AllSystems = std::tuple<Coordinates<PxPy, Pz, Energy>, Coordinates<PxPy, Pz, Mass>,
+                              Coordinates<PxPy, Eta, Energy>, Coordinates<PxPy, Eta, Mass>,
+                              Coordinates<PtPhi, Pz, Energy>, Coordinates<PtPhi, Pz, Mass>,
+                              Coordinates<PtPhi, Eta, Energy>, Coordinates<PtPhi, Eta, Mass>>;
+
+/// The largest error of the squared mass of a pair allowed, in units of
+/// eps (E1 + E2)^2: the bound the library states for every coordinate
+/// system, since an energy and Cartesian momenta hold a mass only as a
+/// difference of numbers of that size. The largest measured here was 1.9,
+/// with Apple's and GNU's libraries on 64-bit Arm and on x86-64.
+constexpr double kSquaredErrorBound = 16;
+
+/** @brief A momentum given by its Cartesian components and its mass; a negative mass is spacelike.
+ */
+struct CartesianMomentum {
+  double px;
+  double py;
+  double pz;
+  double mass;
+};
+
+[[nodiscard]] std::vector<double> chart_values(std::type_identity<PxPy<double>> /*chart*/,
+                                               const CartesianMomentum& momentum) {
+  return {momentum.px, momentum.py};
+}
+[[nodiscard]] std::vector<double> chart_values(std::type_identity<PtPhi<double>> /*chart*/,
+                                               const CartesianMomentum& momentum) {
+  return {std::hypot(momentum.px, momentum.py), std::atan2(momentum.py, momentum.px)};
+}
+[[nodiscard]] std::vector<double> chart_values(std::type_identity<Pz<double>> /*chart*/,
+                                               const CartesianMomentum& momentum) {
+  return {momentum.pz};
+}
+[[nodiscard]] std::vector<double> chart_values(std::type_identity<Eta<double>> /*chart*/,
+                                               const CartesianMomentum& momentum) {
+  return {std::asinh(momentum.pz / std::hypot(momentum.px, momentum.py))};
+}
+[[nodiscard]] std::vector<double> chart_values(std::type_identity<Energy<double>> /*chart*/,
+                                               const CartesianMomentum& momentum) {
+  const double momentum_squared =
+      momentum.px * momentum.px + momentum.py * momentum.py + momentum.pz * momentum.pz;
+  return {std::sqrt(momentum.mass * std::abs(momentum.mass) + momentum_squared)};
+}
+[[nodiscard]] std::vector<double> chart_values(std::type_identity<Mass<double>> /*chart*/,
+                                               const CartesianMomentum& momentum) {
+  return {momentum.mass};
+}
+
+/** @brief The components of a momentum in a coordinate system, computed in double and rounded to T.
+ */
+template <class System, class T>
+[[nodiscard]] std::array<T, System::kComponentCount> components_in(
+    const CartesianMomentum& momentum) {
+  using Charts = decltype(System::template read<double>(nullptr));
+  std::vector<double> values;
+  for (const std::vector<double>& chart :
+       {chart_values(std::type_identity<decltype(Charts::azimuthal)>{}, momentum),
+        chart_values(std::type_identity<decltype(Charts::longitudinal)>{}, momentum),
+        chart_values(std::type_identity<decltype(Charts::temporal)>{}, momentum)}) {
+    values.insert(values.end(), chart.begin(), chart.end());
+  }
+  std::array<T, System::kComponentCount> components{};
+  for (std::size_t index = 0; index < components.size(); ++index) {
+    components[index] = static_cast<T>(values[index]);
+  }
+  return components;
+}
+
+/** @brief The component names of a coordinate system, for messages. */
+template <class System>
+[[nodiscard]] std::string system_name() {
+  std::string name;
+  for (const std::string_view chart : System::kChartComponentNames) {
+    name += (name.empty() ? "" : ",") + std::string(chart);
+  }
+  return name;
+}
+
+/** @brief The components of two particles, the first in System1 and the second in System2. */
+template <class System1, class System2, class T>
+[[nodiscard]] std::array<T, PairMass<System1, System2>::kInputCount> pair_components(
+    const CartesianMomentum& first, const CartesianMomentum& second) {
+  std::array<T, PairMass<System1, System2>::kInputCount> components{};
+  const auto first_components = components_in<System1, T>(first);
+  const auto second_components = components_in<System2, T>(second);
+  std::copy(first_components.begin(), first_components.end(), components.begin());
+  std::copy(second_components.begin(), second_components.end(),
+            components.begin() + System1::kComponentCount);
+  return components;
+}
+
+/** @brief The same values, each in a batch of its own. */
+template <class T, std::size_t kCount>
+[[nodiscard]] std::array<xsimd::batch<T>, kCount> as_batches(const std::array<T, kCount>& values) {
+  std::array<xsimd::batch<T>, kCount> batches;
+  for (std::size_t index = 0; index < kCount; ++index) {
+    batches[index] = xsimd::batch<T>(values[index]);
+  }
+  return batches;
+}
+
+/** @brief The energy of a momentum, in double precision. */
+[[nodiscard]] double energy_of(const CartesianMomentum& momentum) {
+  return chart_values(std::type_identity<Energy<double>>{}, momentum)[0];
+}
+
+/** @brief The error of a mass as a squared mass, in units of eps (E1 + E2)^2. */
+template <class T>
+[[nodiscard]] double squared_mass_error(T mass, double mass_squared, double total_energy) {
+  const auto computed = static_cast<double>(mass);
+  const double epsilon = std::numeric_limits<T>::epsilon();
+  return std::abs(computed * std::abs(computed) - mass_squared) /
+         (epsilon * total_energy * total_energy);
+}
+
+/** @brief Check the mass of a pair given in System1 and System2, on a scalar and on a batch. */
+template <class T, class System1, class System2>
+void check_pair_mass(const CartesianMomentum& first, const CartesianMomentum& second,
+                     double mass_squared) {
+  using Kernel = PairMass<System1, System2>;
+  const auto components = pair_components<System1, System2, T>(first, second);
+  const double total_energy = energy_of(first) + energy_of(second);
+  CAPTURE(system_name<System1>(), system_name<System2>());
+
+  CHECK(squared_mass_error(Kernel{}(components)[0], mass_squared, total_energy) <=
+        kSquaredErrorBound);
+  CHECK(squared_mass_error(Kernel{}(as_batches(components))[0].get(0), mass_squared,
+                           total_energy) <= kSquaredErrorBound);
+}
+
+template <class T, class System1, class... Systems2>
+void check_with_every_second_system(std::type_identity<std::tuple<Systems2...>> /*systems*/,
+                                    const CartesianMomentum& first, const CartesianMomentum& second,
+                                    double mass_squared) {
+  (check_pair_mass<T, System1, Systems2>(first, second, mass_squared), ...);
+}
+
+/** @brief Check the mass of a pair in each of the 64 ordered pairs of coordinate systems. */
+template <class T, class... Systems>
+void check_every_pair_of_systems(const CartesianMomentum& first, const CartesianMomentum& second,
+                                 double mass_squared) {
+  (check_with_every_second_system<T, Systems>(std::type_identity<std::tuple<Systems...>>{}, first,
+                                              second, mass_squared),
+   ...);
+}
+
+template <class T, class... Systems>
+void check_every_pair_of_systems(std::type_identity<std::tuple<Systems...>> /*systems*/,
+                                 const CartesianMomentum& first, const CartesianMomentum& second,
+                                 double mass_squared) {
+  check_every_pair_of_systems<T, Systems...>(first, second, mass_squared);
+}
+
+TEMPLATE_TEST_CASE("Every pair of coordinate systems gives the mass of an exact pair",
+                   "[pair_mass]", float, double) {
+  // (3, 4, 12) with the mass 84 has |p| = 13 and E = 85, and (6, 8, 24) with
+  // the mass 168 has |p| = 26 and E = 170: one velocity, so m = 84 + 168.
+  const CartesianMomentum heavy{3, 4, 12, 84};
+  check_every_pair_of_systems<TestType>(std::type_identity<AllSystems>{}, heavy, {6, 8, 24, 168},
+                                        252.0 * 252.0);
+  // A massless particle collinear with the first: m^2 = 111^2 - 39^2.
+  check_every_pair_of_systems<TestType>(std::type_identity<AllSystems>{}, heavy, {6, 8, 24, 0},
+                                        10800.0);
+  // A massless particle in another direction: m^2 = 7056 + 2 (85 26 - 288).
+  check_every_pair_of_systems<TestType>(std::type_identity<AllSystems>{}, heavy, {-8, 6, 24, 0},
+                                        10900.0);
+  // Two spacelike momenta, E = 3 for |p| = 5 and E = 12 for |p| = 13, whose
+  // sum is spacelike: m^2 = 15^2 - 234.
+  check_every_pair_of_systems<TestType>(std::type_identity<AllSystems>{}, {3, 4, 0, -4},
+                                        {0, 5, 12, -5}, -9.0);
+}
+
+/** @brief Check that a NaN in any component of a pair in System gives NaN. */
+template <class T, class System>
+void check_nan_in_every_component() {
+  using Kernel = PairMass<System, System>;
+  const auto finite =
+      pair_components<System, System, T>(CartesianMomentum{3, 4, 12, 84}, {-8, 6, 24, 0});
+  CAPTURE(system_name<System>());
+  REQUIRE(std::isfinite(Kernel{}(finite)[0]));
+  for (std::size_t position = 0; position < finite.size(); ++position) {
+    CAPTURE(position);
+    auto components = finite;
+    components[position] = std::numeric_limits<T>::quiet_NaN();
+
+    CHECK(std::isnan(Kernel{}(components)[0]));
+    CHECK(std::isnan(Kernel{}(as_batches(components))[0].get(0)));
+  }
+}
+
+template <class T, class... Systems>
+void check_nan_in_every_system(std::type_identity<std::tuple<Systems...>> /*systems*/) {
+  (check_nan_in_every_component<T, Systems>(), ...);
+}
+
+TEMPLATE_TEST_CASE("A NaN in any component gives NaN in every coordinate system", "[pair_mass]",
+                   float, double) {
+  check_nan_in_every_system<TestType>(std::type_identity<AllSystems>{});
+}
+
+/// The largest difference allowed between a squared mass on a batch and on a
+/// scalar, in units of eps (E1 + E2)^2, the scale on which a sum of energies
+/// and momenta holds it. The largest measured was 4.6, with Apple's and
+/// GNU's libraries on 64-bit Arm and on x86-64, and the bound is twice that,
+/// rounded up.
+constexpr double kBatchSquaredBound = 10;
+
+/** @brief The largest difference between squared masses of pairs on batches and on scalars, in
+ * System. */
+template <class T, class System>
+[[nodiscard]] double largest_batch_difference(const PairColumns<T>& pairs) {
+  using Kernel = PairMass<System, System>;
+  using Batch = xsimd::batch<T>;
+  REQUIRE(pairs.size() % Batch::size == 0);
+  const auto cartesian = [](double pt, double eta, double phi, double mass) {
+    return CartesianMomentum{pt * std::cos(phi), pt * std::sin(phi), pt * std::sinh(eta), mass};
+  };
+  std::vector<std::array<T, Kernel::kInputCount>> components(pairs.size());
+  std::vector<double> total_energies(pairs.size());
+  for (std::size_t index = 0; index < pairs.size(); ++index) {
+    const CartesianMomentum first =
+        cartesian(pairs.pt1[index], pairs.eta1[index], pairs.phi1[index], pairs.mass1[index]);
+    const CartesianMomentum second =
+        cartesian(pairs.pt2[index], pairs.eta2[index], pairs.phi2[index], pairs.mass2[index]);
+    components[index] = pair_components<System, System, T>(first, second);
+    total_energies[index] = energy_of(first) + energy_of(second);
+  }
+  double largest = 0;
+  for (std::size_t offset = 0; offset < pairs.size(); offset += Batch::size) {
+    std::array<Batch, Kernel::kInputCount> batches;
+    for (std::size_t column = 0; column < Kernel::kInputCount; ++column) {
+      std::array<T, Batch::size> lanes{};
+      for (std::size_t lane = 0; lane < Batch::size; ++lane) {
+        lanes[lane] = components[offset + lane][column];
+      }
+      batches[column] = Batch::load_unaligned(lanes.data());
+    }
+    const Batch on_batch = Kernel{}(batches)[0];
+    for (std::size_t lane = 0; lane < Batch::size; ++lane) {
+      const T on_scalar = Kernel{}(components[offset + lane])[0];
+      const double scalar_squared =
+          static_cast<double>(on_scalar) * std::abs(static_cast<double>(on_scalar));
+      largest = std::max(largest, squared_mass_error(on_batch.get(lane), scalar_squared,
+                                                     total_energies[offset + lane]));
+    }
+  }
+  return largest;
+}
+
+template <class T, class... Systems>
+void check_batches_in_every_system(std::type_identity<std::tuple<Systems...>> /*systems*/,
+                                   const PairColumns<T>& pairs) {
+  (
+      [&pairs] {
+        CAPTURE(system_name<Systems>());
+        CHECK(largest_batch_difference<T, Systems>(pairs) <= kBatchSquaredBound);
+      }(),
+      ...);
+}
+
+TEMPLATE_TEST_CASE("Every coordinate system gives the same mass on a batch as on a scalar",
+                   "[pair_mass]", float, double) {
+  check_batches_in_every_system<TestType>(std::type_identity<AllSystems>{},
+                                          sample_pairs<TestType>(2048));
 }
 
 }  // namespace
