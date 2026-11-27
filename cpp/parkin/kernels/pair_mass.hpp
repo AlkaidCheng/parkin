@@ -224,36 +224,8 @@ struct PairMass {
   }
 };
 
-/**
- * @brief Invariant mass of two particles given in (pT, eta, phi, mass).
- *
- * PairMass for two particles in that system, with the components in the
- * order (pT, eta, phi, mass) of each particle rather than in the order of
- * the charts, (pT, phi, eta, mass).
- */
-struct PairMassPtEtaPhiM {
-  /** @brief Number of input columns: four per particle. */
-  static constexpr std::size_t kInputCount = 8;
-  /** @brief Number of output columns. */
-  static constexpr std::size_t kOutputCount = 1;
-
-  /**
-   * @tparam V A floating-point scalar or an xsimd batch of one.
-   * @param components (pT, eta, phi, mass) of the first particle, then of the
-   *                   second: transverse momenta, non-negative;
-   *                   pseudorapidities; azimuthal angles in radians, in any
-   *                   range; masses, in the unit of the transverse momenta.
-   * @return The invariant mass of the pair, in the same unit.
-   */
-  template <class V>
-  [[nodiscard]] std::array<V, kOutputCount> operator()(
-      const std::array<V, kInputCount>& components) const noexcept {
-    using System = Coordinates<PtPhi, Eta, Mass>;
-    return PairMass<System, System>{}(
-        std::array<V, kInputCount>{components[0], components[2], components[1], components[3],
-                                   components[4], components[6], components[5], components[7]});
-  }
-};
+/** @brief Invariant mass of two particles given in (pT, eta, phi, mass). */
+using PairMassPtEtaPhiM = PairMass<PtEtaPhiM, PtEtaPhiM>;
 
 }  // namespace parkin::kernels
 

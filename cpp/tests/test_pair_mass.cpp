@@ -177,20 +177,13 @@ TEMPLATE_TEST_CASE("The kernel gives the same mass on a batch as on a scalar", "
 
 // --- Coordinate systems -----------------------------------------------------
 
-using parkin::kernels::Coordinates;
-using parkin::kernels::Energy;
-using parkin::kernels::Eta;
-using parkin::kernels::Mass;
 using parkin::kernels::PairMass;
-using parkin::kernels::PtPhi;
-using parkin::kernels::PxPy;
-using parkin::kernels::Pz;
 
 /// The eight coordinate systems: one chart of each part of a four-momentum.
-using AllSystems = std::tuple<Coordinates<PxPy, Pz, Energy>, Coordinates<PxPy, Pz, Mass>,
-                              Coordinates<PxPy, Eta, Energy>, Coordinates<PxPy, Eta, Mass>,
-                              Coordinates<PtPhi, Pz, Energy>, Coordinates<PtPhi, Pz, Mass>,
-                              Coordinates<PtPhi, Eta, Energy>, Coordinates<PtPhi, Eta, Mass>>;
+using AllSystems =
+    std::tuple<parkin::kernels::PxPyPzE, parkin::kernels::PxPyPzM, parkin::kernels::PxPyEtaE,
+               parkin::kernels::PxPyEtaM, parkin::kernels::PtPhiPzE, parkin::kernels::PtPhiPzM,
+               parkin::kernels::PtEtaPhiE, parkin::kernels::PtEtaPhiM>;
 
 /// The largest error of the squared mass of a pair allowed, in units of
 /// eps (E1 + E2)^2: the bound the library states for every coordinate
@@ -208,49 +201,46 @@ struct CartesianMomentum {
   double mass;
 };
 
-[[nodiscard]] std::vector<double> chart_values(std::type_identity<PxPy<double>> /*chart*/,
-                                               const CartesianMomentum& momentum) {
-  return {momentum.px, momentum.py};
-}
-[[nodiscard]] std::vector<double> chart_values(std::type_identity<PtPhi<double>> /*chart*/,
-                                               const CartesianMomentum& momentum) {
-  return {std::hypot(momentum.px, momentum.py), std::atan2(momentum.py, momentum.px)};
-}
-[[nodiscard]] std::vector<double> chart_values(std::type_identity<Pz<double>> /*chart*/,
-                                               const CartesianMomentum& momentum) {
-  return {momentum.pz};
-}
-[[nodiscard]] std::vector<double> chart_values(std::type_identity<Eta<double>> /*chart*/,
-                                               const CartesianMomentum& momentum) {
-  return {std::asinh(momentum.pz / std::hypot(momentum.px, momentum.py))};
-}
-[[nodiscard]] std::vector<double> chart_values(std::type_identity<Energy<double>> /*chart*/,
-                                               const CartesianMomentum& momentum) {
-  const double momentum_squared =
-      momentum.px * momentum.px + momentum.py * momentum.py + momentum.pz * momentum.pz;
-  return {std::sqrt(momentum.mass * std::abs(momentum.mass) + momentum_squared)};
-}
-[[nodiscard]] std::vector<double> chart_values(std::type_identity<Mass<double>> /*chart*/,
-                                               const CartesianMomentum& momentum) {
-  return {momentum.mass};
+/** @brief A component of a momentum, by name, computed in double precision. */
+[[nodiscard]] double component_of(const CartesianMomentum& momentum, std::string_view name) {
+  const double pt = std::hypot(momentum.px, momentum.py);
+  const double momentum_squared = pt * pt + momentum.pz * momentum.pz;
+  if (name == "px") {
+    return momentum.px;
+  }
+  if (name == "py") {
+    return momentum.py;
+  }
+  if (name == "pz") {
+    return momentum.pz;
+  }
+  if (name == "pt") {
+    return pt;
+  }
+  if (name == "phi") {
+    return std::atan2(momentum.py, momentum.px);
+  }
+  if (name == "eta") {
+    return std::asinh(momentum.pz / pt);
+  }
+  if (name == "energy") {
+    return std::sqrt(momentum.mass * std::abs(momentum.mass) + momentum_squared);
+  }
+  if (name == "mass") {
+    return momentum.mass;
+  }
+  FAIL("no component named " << name);
+  return 0;
 }
 
-/** @brief The components of a momentum in a coordinate system, computed in double and rounded to T.
- */
+/** @brief The components of a momentum in a coordinate system, in the order it lists them, rounded
+ * to T. */
 template <class System, class T>
 [[nodiscard]] std::array<T, System::kComponentCount> components_in(
     const CartesianMomentum& momentum) {
-  using Charts = decltype(System::template read<double>(nullptr));
-  std::vector<double> values;
-  for (const std::vector<double>& chart :
-       {chart_values(std::type_identity<decltype(Charts::azimuthal)>{}, momentum),
-        chart_values(std::type_identity<decltype(Charts::longitudinal)>{}, momentum),
-        chart_values(std::type_identity<decltype(Charts::temporal)>{}, momentum)}) {
-    values.insert(values.end(), chart.begin(), chart.end());
-  }
   std::array<T, System::kComponentCount> components{};
   for (std::size_t index = 0; index < components.size(); ++index) {
-    components[index] = static_cast<T>(values[index]);
+    components[index] = static_cast<T>(component_of(momentum, System::kComponentNames[index]));
   }
   return components;
 }
@@ -259,8 +249,8 @@ template <class System, class T>
 template <class System>
 [[nodiscard]] std::string system_name() {
   std::string name;
-  for (const std::string_view chart : System::kChartComponentNames) {
-    name += (name.empty() ? "" : ",") + std::string(chart);
+  for (const std::string_view component : System::kComponentNames) {
+    name += (name.empty() ? "" : ",") + std::string(component);
   }
   return name;
 }
@@ -290,7 +280,7 @@ template <class T, std::size_t kCount>
 
 /** @brief The energy of a momentum, in double precision. */
 [[nodiscard]] double energy_of(const CartesianMomentum& momentum) {
-  return chart_values(std::type_identity<Energy<double>>{}, momentum)[0];
+  return component_of(momentum, "energy");
 }
 
 /** @brief The error of a mass as a squared mass, in units of eps (E1 + E2)^2. */
