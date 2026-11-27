@@ -2,6 +2,7 @@
 # or reach only through other code.
 add_executable(
   parkin_cpp_tests
+  test_coordinates.cpp
   test_instruction_set.cpp
   test_map_executor.cpp
   test_map_kernels.cpp
