@@ -55,51 +55,45 @@ struct Reference {
   T mass_squared = T(7056);
 };
 
+/** @brief A component of the reference momentum, by name. */
 template <class T>
-[[nodiscard]] std::array<T, 2> chart_components(std::type_identity<PxPy<T>> /*chart*/,
-                                                const Reference<T>& reference) {
-  return {reference.px, reference.py};
-}
-template <class T>
-[[nodiscard]] std::array<T, 2> chart_components(std::type_identity<PtPhi<T>> /*chart*/,
-                                                const Reference<T>& reference) {
-  return {reference.pt, reference.phi};
-}
-template <class T>
-[[nodiscard]] std::array<T, 1> chart_components(std::type_identity<Pz<T>> /*chart*/,
-                                                const Reference<T>& reference) {
-  return {reference.pz};
-}
-template <class T>
-[[nodiscard]] std::array<T, 1> chart_components(std::type_identity<Eta<T>> /*chart*/,
-                                                const Reference<T>& reference) {
-  return {reference.eta};
-}
-template <class T>
-[[nodiscard]] std::array<T, 1> chart_components(std::type_identity<Energy<T>> /*chart*/,
-                                                const Reference<T>& reference) {
-  return {reference.energy};
-}
-template <class T>
-[[nodiscard]] std::array<T, 1> chart_components(std::type_identity<Mass<T>> /*chart*/,
-                                                const Reference<T>& reference) {
-  return {reference.mass};
+[[nodiscard]] T component_of(const Reference<T>& reference, std::string_view name) {
+  if (name == "px") {
+    return reference.px;
+  }
+  if (name == "py") {
+    return reference.py;
+  }
+  if (name == "pz") {
+    return reference.pz;
+  }
+  if (name == "pt") {
+    return reference.pt;
+  }
+  if (name == "phi") {
+    return reference.phi;
+  }
+  if (name == "eta") {
+    return reference.eta;
+  }
+  if (name == "energy") {
+    return reference.energy;
+  }
+  if (name == "mass") {
+    return reference.mass;
+  }
+  FAIL("no component named " << name);
+  return T(0);
 }
 
-/** @brief The components of the reference momentum in a coordinate system. */
+/** @brief The components of the reference momentum in a coordinate system, in the order it lists
+ * them. */
 template <class System, class T>
 [[nodiscard]] std::array<T, System::kComponentCount> components_in(const Reference<T>& reference) {
-  using Charts = decltype(System::template read<T>(nullptr));
   std::array<T, System::kComponentCount> components{};
-  std::size_t next = 0;
-  const auto append = [&components, &next](const auto& chart) {
-    for (const T component : chart) {
-      components[next++] = component;
-    }
-  };
-  append(chart_components(std::type_identity<decltype(Charts::azimuthal)>{}, reference));
-  append(chart_components(std::type_identity<decltype(Charts::longitudinal)>{}, reference));
-  append(chart_components(std::type_identity<decltype(Charts::temporal)>{}, reference));
+  for (std::size_t index = 0; index < components.size(); ++index) {
+    components[index] = component_of(reference, System::kComponentNames[index]);
+  }
   return components;
 }
 
@@ -125,25 +119,40 @@ void check_conversion_of_reference() {
   }
 }
 
-TEST_CASE("A coordinate system lists the components of its charts in order", "[coordinates]") {
-  using CartesianEnergy = Coordinates<PxPy, Pz, Energy>;
-  using PolarMass = Coordinates<PtPhi, Eta, Mass>;
+TEST_CASE("A coordinate system lists its components in the customary order", "[coordinates]") {
+  using Names4 = std::array<std::string_view, 4>;
+  CHECK(PxPyPzE::kComponentNames == Names4{"px", "py", "pz", "energy"});
+  CHECK(PxPyPzM::kComponentNames == Names4{"px", "py", "pz", "mass"});
+  CHECK(PxPyEtaE::kComponentNames == Names4{"px", "py", "eta", "energy"});
+  CHECK(PxPyEtaM::kComponentNames == Names4{"px", "py", "eta", "mass"});
+  CHECK(PtPhiPzE::kComponentNames == Names4{"pt", "phi", "pz", "energy"});
+  CHECK(PtPhiPzM::kComponentNames == Names4{"pt", "phi", "pz", "mass"});
+  CHECK(PtEtaPhiE::kComponentNames == Names4{"pt", "eta", "phi", "energy"});
+  CHECK(PtEtaPhiM::kComponentNames == Names4{"pt", "eta", "phi", "mass"});
+  CHECK(CommonCoordinates::kComponentNames ==
+        std::array<std::string_view, 5>{"px", "py", "pz", "energy", "mass_squared"});
+}
 
-  CHECK(CartesianEnergy::kComponentCount == 4);
-  CHECK(CartesianEnergy::kChartComponentNames ==
-        std::array<std::string_view, 3>{"px,py", "pz", "energy"});
-  CHECK(PolarMass::kChartComponentNames ==
-        std::array<std::string_view, 3>{"pt,phi", "eta", "mass"});
-  CHECK(CommonCoordinates::kComponentCount == 5);
-  CHECK(CommonCoordinates::kChartComponentNames ==
-        std::array<std::string_view, 3>{"px,py", "pz", "energy,mass_squared"});
+TEST_CASE("A coordinate system reads each chart from the place of its components",
+          "[coordinates]") {
+  // In (pt, eta, phi, mass) the longitudinal component lies between the two
+  // azimuthal ones.
+  const std::array<double, 4> polar{5.0, 0.3, 0.1, 84.0};
+  const auto particle = PtEtaPhiM::read(polar.data());
+  CHECK(particle.azimuthal.pt == 5.0);
+  CHECK(particle.azimuthal.phi == 0.1);
+  CHECK(particle.longitudinal.eta == 0.3);
+  CHECK(particle.temporal.mass == 84.0);
 
-  const std::array<double, 4> components{3.0, 4.0, 12.0, 85.0};
-  const auto momentum = CartesianEnergy::read(components.data());
-  CHECK(momentum.azimuthal.px == 3.0);
-  CHECK(momentum.azimuthal.py == 4.0);
-  CHECK(momentum.longitudinal.pz == 12.0);
-  CHECK(momentum.temporal.energy == 85.0);
+  const std::array<double, 4> cartesian{3.0, 4.0, 12.0, 85.0};
+  const auto same = PxPyPzE::read(cartesian.data());
+  CHECK(same.azimuthal.px == 3.0);
+  CHECK(same.azimuthal.py == 4.0);
+  CHECK(same.longitudinal.pz == 12.0);
+  CHECK(same.temporal.energy == 85.0);
+
+  CHECK(PtEtaPhiM::position_of("phi") == 2);
+  CHECK(PtEtaPhiM::position_of("eta") == 1);
 }
 
 TEMPLATE_TEST_CASE("Each chart of a part gives the same momentum", "[coordinates]", float, double) {
@@ -206,21 +215,21 @@ TEMPLATE_TEST_CASE("A null momentum has zero energy terms", "[coordinates]", flo
 TEMPLATE_TEST_CASE("Every coordinate system converts to the same common coordinates",
                    "[coordinates]", float, double) {
   using T = TestType;
-  check_conversion_of_reference<Coordinates<PxPy, Pz, Energy>, T>();
-  check_conversion_of_reference<Coordinates<PxPy, Pz, Mass>, T>();
-  check_conversion_of_reference<Coordinates<PxPy, Eta, Energy>, T>();
-  check_conversion_of_reference<Coordinates<PxPy, Eta, Mass>, T>();
-  check_conversion_of_reference<Coordinates<PtPhi, Pz, Energy>, T>();
-  check_conversion_of_reference<Coordinates<PtPhi, Pz, Mass>, T>();
-  check_conversion_of_reference<Coordinates<PtPhi, Eta, Energy>, T>();
-  check_conversion_of_reference<Coordinates<PtPhi, Eta, Mass>, T>();
+  check_conversion_of_reference<PxPyPzE, T>();
+  check_conversion_of_reference<PxPyPzM, T>();
+  check_conversion_of_reference<PxPyEtaE, T>();
+  check_conversion_of_reference<PxPyEtaM, T>();
+  check_conversion_of_reference<PtPhiPzE, T>();
+  check_conversion_of_reference<PtPhiPzM, T>();
+  check_conversion_of_reference<PtEtaPhiE, T>();
+  check_conversion_of_reference<PtEtaPhiM, T>();
 }
 
 TEMPLATE_TEST_CASE("A conversion on batches agrees with the one on scalars", "[coordinates]", float,
                    double) {
   using T = TestType;
   using Batch = xsimd::batch<T>;
-  using System = Coordinates<PtPhi, Eta, Mass>;
+  using System = PtEtaPhiM;
   constexpr std::size_t kCount = 4096;
   REQUIRE(kCount % Batch::size == 0);
   const PairColumns<T> pairs = sample_pairs<T>(kCount);
@@ -233,15 +242,15 @@ TEMPLATE_TEST_CASE("A conversion on batches agrees with the one on scalars", "[c
   }
   for (std::size_t index = 0; index < kCount; ++index) {
     const std::array<T, 5> converted = ToCommonCoordinates<System>{}(std::array<T, 4>{
-        pairs.pt1[index], pairs.phi1[index], pairs.eta1[index], pairs.mass1[index]});
+        pairs.pt1[index], pairs.eta1[index], pairs.phi1[index], pairs.mass1[index]});
     for (std::size_t output = 0; output < 5; ++output) {
       on_scalars[output][index] = converted[output];
     }
   }
   for (std::size_t index = 0; index < kCount; index += Batch::size) {
     const std::array<Batch, 5> converted = ToCommonCoordinates<System>{}(std::array<Batch, 4>{
-        Batch::load_unaligned(&pairs.pt1[index]), Batch::load_unaligned(&pairs.phi1[index]),
-        Batch::load_unaligned(&pairs.eta1[index]), Batch::load_unaligned(&pairs.mass1[index])});
+        Batch::load_unaligned(&pairs.pt1[index]), Batch::load_unaligned(&pairs.eta1[index]),
+        Batch::load_unaligned(&pairs.phi1[index]), Batch::load_unaligned(&pairs.mass1[index])});
     for (std::size_t output = 0; output < 5; ++output) {
       converted[output].store_unaligned(&on_batches[output][index]);
     }

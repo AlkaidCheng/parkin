@@ -41,7 +41,7 @@ namespace parkin::kernels {
 template <class V>
 struct PxPy {
   static constexpr std::size_t kComponentCount = 2;
-  static constexpr std::string_view kComponentNames = "px,py";
+  static constexpr std::array<std::string_view, 2> kComponentNames{"px", "py"};
   V px;
   V py;
 };
@@ -50,7 +50,7 @@ struct PxPy {
 template <class V>
 struct PtPhi {
   static constexpr std::size_t kComponentCount = 2;
-  static constexpr std::string_view kComponentNames = "pt,phi";
+  static constexpr std::array<std::string_view, 2> kComponentNames{"pt", "phi"};
   V pt;
   V phi;
 };
@@ -59,7 +59,7 @@ struct PtPhi {
 template <class V>
 struct Pz {
   static constexpr std::size_t kComponentCount = 1;
-  static constexpr std::string_view kComponentNames = "pz";
+  static constexpr std::array<std::string_view, 1> kComponentNames{"pz"};
   V pz;
 };
 
@@ -67,7 +67,7 @@ struct Pz {
 template <class V>
 struct Eta {
   static constexpr std::size_t kComponentCount = 1;
-  static constexpr std::string_view kComponentNames = "eta";
+  static constexpr std::array<std::string_view, 1> kComponentNames{"eta"};
   V eta;
 };
 
@@ -75,7 +75,7 @@ struct Eta {
 template <class V>
 struct Energy {
   static constexpr std::size_t kComponentCount = 1;
-  static constexpr std::string_view kComponentNames = "energy";
+  static constexpr std::array<std::string_view, 1> kComponentNames{"energy"};
   V energy;
 };
 
@@ -88,7 +88,7 @@ struct Energy {
 template <class V>
 struct Mass {
   static constexpr std::size_t kComponentCount = 1;
-  static constexpr std::string_view kComponentNames = "mass";
+  static constexpr std::array<std::string_view, 1> kComponentNames{"mass"};
   V mass;
 };
 
@@ -102,7 +102,7 @@ struct Mass {
 template <class V>
 struct EnergyMassSquared {
   static constexpr std::size_t kComponentCount = 2;
-  static constexpr std::string_view kComponentNames = "energy,mass_squared";
+  static constexpr std::array<std::string_view, 2> kComponentNames{"energy", "mass_squared"};
   V energy;
   V mass_squared;
 };
@@ -117,16 +117,26 @@ struct Momentum {
   Temporal temporal;
 };
 
+/**
+ * @brief The order in which a coordinate system lists its components.
+ *
+ * A system lists the components it holds in this order, which gives the
+ * customary (px, py, pz, energy) and (pt, eta, phi, mass), and the same rule
+ * for every other system. It is the order of `Particles.coordinates` in
+ * Python.
+ */
+inline constexpr std::array<std::string_view, 9> kComponentOrder{
+    "px", "py", "pt", "eta", "phi", "pz", "energy", "mass", "mass_squared"};
+
 namespace detail {
 
-/** @brief A chart from its components, the first of which is at @p components. */
-template <class Chart, class V>
-[[nodiscard]] Chart read_chart(const V* components) noexcept {
-  if constexpr (Chart::kComponentCount == 1) {
-    return Chart{components[0]};
-  } else {
-    return Chart{components[0], components[1]};
+/** @brief The place of a component name in kComponentOrder, or its size for an unknown name. */
+[[nodiscard]] constexpr std::size_t component_rank(std::string_view name) noexcept {
+  std::size_t rank = 0;
+  while (rank < kComponentOrder.size() && kComponentOrder[rank] != name) {
+    ++rank;
   }
+  return rank;
 }
 
 }  // namespace detail
@@ -134,8 +144,10 @@ template <class Chart, class V>
 /**
  * @brief A coordinate system: one chart of each part of a four-momentum.
  *
- * Its components are those of the azimuthal chart, then of the longitudinal
- * one, then of the temporal one.
+ * Its components are those of its three charts, listed in the order of
+ * kComponentOrder: (pt, eta, phi, mass) for Coordinates<PtPhi, Eta, Mass>.
+ * The positions are fixed when the system is compiled, so reading a
+ * momentum costs nothing beyond the loads.
  */
 template <template <class> class AzimuthalChart, template <class> class LongitudinalChart,
           template <class> class TemporalChart>
@@ -145,23 +157,86 @@ struct Coordinates {
                                                  LongitudinalChart<float>::kComponentCount +
                                                  TemporalChart<float>::kComponentCount;
 
-  /** @brief The comma-separated component names of each chart, in the order of the components. */
-  static constexpr std::array<std::string_view, 3> kChartComponentNames = {
-      AzimuthalChart<float>::kComponentNames, LongitudinalChart<float>::kComponentNames,
-      TemporalChart<float>::kComponentNames};
+ private:
+  /** @brief The component names of the charts, sorted by kComponentOrder. */
+  [[nodiscard]] static constexpr std::array<std::string_view, kComponentCount> sorted_names() {
+    std::array<std::string_view, kComponentCount> names{};
+    std::size_t count = 0;
+    for (const std::string_view name : AzimuthalChart<float>::kComponentNames) {
+      names[count++] = name;
+    }
+    for (const std::string_view name : LongitudinalChart<float>::kComponentNames) {
+      names[count++] = name;
+    }
+    for (const std::string_view name : TemporalChart<float>::kComponentNames) {
+      names[count++] = name;
+    }
+    // Insertion sort: a handful of names, at compile time.
+    for (std::size_t index = 1; index < names.size(); ++index) {
+      const std::string_view name = names[index];
+      std::size_t place = index;
+      while (place > 0 && detail::component_rank(names[place - 1]) > detail::component_rank(name)) {
+        names[place] = names[place - 1];
+        --place;
+      }
+      names[place] = name;
+    }
+    return names;
+  }
+
+ public:
+  /** @brief The names of the components, in the order the system lists them. */
+  static constexpr std::array<std::string_view, kComponentCount> kComponentNames = sorted_names();
+
+  /** @brief The position of a component, by name, among the components of the system. */
+  [[nodiscard]] static constexpr std::size_t position_of(std::string_view name) noexcept {
+    std::size_t position = 0;
+    while (position < kComponentNames.size() && kComponentNames[position] != name) {
+      ++position;
+    }
+    return position;
+  }
 
   /** @brief A momentum from its kComponentCount components, the first of which is at @p components.
    */
   template <class V>
   [[nodiscard]] static Momentum<AzimuthalChart<V>, LongitudinalChart<V>, TemporalChart<V>> read(
       const V* components) noexcept {
-    const V* const longitudinal = components + AzimuthalChart<V>::kComponentCount;
-    const V* const temporal = longitudinal + LongitudinalChart<V>::kComponentCount;
-    return {detail::read_chart<AzimuthalChart<V>>(components),
-            detail::read_chart<LongitudinalChart<V>>(longitudinal),
-            detail::read_chart<TemporalChart<V>>(temporal)};
+    return {read_chart<AzimuthalChart<V>>(components), read_chart<LongitudinalChart<V>>(components),
+            read_chart<TemporalChart<V>>(components)};
   }
+
+ private:
+  template <class Chart, class V>
+  [[nodiscard]] static Chart read_chart(const V* components) noexcept {
+    constexpr std::size_t kFirst = position_of(Chart::kComponentNames[0]);
+    if constexpr (Chart::kComponentCount == 1) {
+      return Chart{components[kFirst]};
+    } else {
+      constexpr std::size_t kSecond = position_of(Chart::kComponentNames[1]);
+      return Chart{components[kFirst], components[kSecond]};
+    }
+  }
+
+  // A name missing from kComponentOrder sorts last, so checking the last name checks
+  // them all.
+  static_assert(detail::component_rank(kComponentNames[kComponentCount - 1]) <
+                    kComponentOrder.size(),
+                "every component name of a chart must have its place in kComponentOrder");
 };
+
+// The eight coordinate systems, named by their components in the order they
+// are listed. The four of ROOT's GenVector carry its names (PxPyPzE4D and the
+// others, https://root.cern/doc/v636/group__GenVector.html) without the 4D.
+
+using PxPyPzE = Coordinates<PxPy, Pz, Energy>;      ///< (px, py, pz, energy)
+using PxPyPzM = Coordinates<PxPy, Pz, Mass>;        ///< (px, py, pz, mass)
+using PxPyEtaE = Coordinates<PxPy, Eta, Energy>;    ///< (px, py, eta, energy)
+using PxPyEtaM = Coordinates<PxPy, Eta, Mass>;      ///< (px, py, eta, mass)
+using PtPhiPzE = Coordinates<PtPhi, Pz, Energy>;    ///< (pt, phi, pz, energy)
+using PtPhiPzM = Coordinates<PtPhi, Pz, Mass>;      ///< (pt, phi, pz, mass)
+using PtEtaPhiE = Coordinates<PtPhi, Eta, Energy>;  ///< (pt, eta, phi, energy)
+using PtEtaPhiM = Coordinates<PtPhi, Eta, Mass>;    ///< (pt, eta, phi, mass)
 
 /**
  * @brief The system the arguments of a kernel are brought to when they are
