@@ -90,10 +90,12 @@ TEMPLATE_TEST_CASE(
   const std::vector<TestType> angles = evenly_spaced<TestType>(-6.5, 6.5, 2048);
   const std::vector<TestType> rapidities = evenly_spaced<TestType>(-6, 6, 2048);
   const auto sine = [](const auto& x) { return math::sin(x); };
+  const auto cosine = [](const auto& x) { return math::cos(x); };
   const auto hyperbolic_sine = [](const auto& x) { return math::sinh(x); };
   const auto hyperbolic_cosine = [](const auto& x) { return math::cosh(x); };
 
   CHECK(largest_ulp_distance(on_batches(angles, sine), on_scalars(angles, sine)) <= kUlpBound);
+  CHECK(largest_ulp_distance(on_batches(angles, cosine), on_scalars(angles, cosine)) <= kUlpBound);
   CHECK(largest_ulp_distance(on_batches(rapidities, hyperbolic_sine),
                              on_scalars(rapidities, hyperbolic_sine)) <= kUlpBound);
   CHECK(largest_ulp_distance(on_batches(rapidities, hyperbolic_cosine),

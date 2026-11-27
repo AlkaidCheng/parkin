@@ -59,6 +59,17 @@ template <class T, class Arch>
   return xsimd::copysign(magnitude, sign);
 }
 
+/** @brief Cosine of an angle in radians. */
+template <std::floating_point T>
+[[nodiscard]] inline T cos(T x) noexcept {
+  return std::cos(x);
+}
+
+template <class T, class Arch>
+[[nodiscard]] inline xsimd::batch<T, Arch> cos(const xsimd::batch<T, Arch>& x) noexcept {
+  return xsimd::cos(x);
+}
+
 /** @brief Hyperbolic cosine. */
 template <std::floating_point T>
 [[nodiscard]] inline T cosh(T x) noexcept {
